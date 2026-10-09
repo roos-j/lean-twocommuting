@@ -23,6 +23,10 @@ Discrepancies: [ErrorReport.md](ErrorReport.md).
   commit/push; later commits need new explicit instructions.
 - **P4** (raw entry P4): "still didnt commit, please do so now and push" —
   commit and push immediately, before the build is verified.
+- **P5** (2026-10-09T06:18:48-04:00, raw entry P5): "commit and push, then write a
+  brief readme stating the main results precisely and referring to the Lean statements" —
+  one-time authorization: commit the completed formalization and push; then write a brief
+  `README.md` stating the main results and pointing to the Lean declarations.
 
 ## Source
 
@@ -79,7 +83,7 @@ theorem commuting_ergodic_averages_converge_ae
   - `TwoCommuting/Auto/Sec8GaussianPrimitives.lean` — §8, S01–S02
   - `TwoCommuting/Auto/Sec9DiscreteTransformations.lean` — §9, T01–T05
   - `TwoCommuting/Auto/Sec10IntegrableExtension.lean` — §10, T06–T08
-- No `sorry`, `admit`, or new axioms. No commits or pushes beyond the P2/P3 initial commit and push.
+- No `sorry`, `admit`, or new axioms. No commits or pushes beyond those explicitly authorized (P2/P3 initial commit, P5).
 
 ## Toolchain and build
 
@@ -96,8 +100,17 @@ theorem commuting_ergodic_averages_converge_ae
 
 ## Latest verification
 
-- (none yet)
+- 2026-10-08T23:46:02-04:00: `lake build` succeeds; `#print axioms` on the §2 and §3 node
+  theorems (e.g. `Auto.lattice_sampling_dominated_convergence`,
+  `Auto.nonnegative_Lp_norm_test`, `Auto.L1_kernel_bilinear_continuity`,
+  `Auto.cyclic_trace_control`, `Auto.matCost_average_le`) reports only
+  `propext, Classical.choice, Quot.sound`.
 
 ## Next step
 
-- Project setup, initial commit (P2), then node A01.
+- §4 (`TwoCommuting/Auto/Sec4GaussianEnergies.lean`): definitions of §4.1 and Lemma 4.1 (H01).
+  Plan: work on `ℝ³` with weight `g_{βs}(p₀+p₁+p₂)` (equivalent to the plane averages by the
+  change of variables `d = p₀+p₁+p₂`), regularized energies `Φ_η(T_v)`, derivatives from
+  `hasDerivAt_energyReg` / `hasDerivAt_energy_hessian`, and integrate the pointwise identity
+  in `s` by FTC + Fubini instead of differentiating `J̄` under the integral sign.
+- M05 is formalized with all three spaces `H_v` equal to one index type (the case used in §4).

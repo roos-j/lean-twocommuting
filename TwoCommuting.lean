@@ -6,6 +6,14 @@ Authors: Claude
 module
 
 public import TwoCommuting.Auto.Sec2ElementaryPreparation
+public import TwoCommuting.Auto.Sec3MatrixInequalities
+public import TwoCommuting.Auto.Sec4GaussianEnergies
+public import TwoCommuting.Auto.Sec5OutputDependentIntervals
+public import TwoCommuting.Auto.Sec6EuclideanCounting
+public import TwoCommuting.Auto.Sec7FlowTransference
+public import TwoCommuting.Auto.Sec8GaussianPrimitives
+public import TwoCommuting.Auto.Sec9DiscreteTransformations
+public import TwoCommuting.Auto.Sec10IntegrableExtension
 
 /-!
 # Pointwise convergence for two commuting transformations

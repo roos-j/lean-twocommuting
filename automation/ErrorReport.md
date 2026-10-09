@@ -5,4 +5,162 @@
 Discrepancies between the formalization and
 `blueprint/commuting_ergodic_blueprint.tex`. Timestamps are local (UTC-04:00).
 
-(No entries yet.)
+
+## 2026-10-08T22:43:00-04:00 — §3 cost and supports (Lemmas 3.1–3.3)
+
+- Source: §3 preamble and Lemmas 3.1–3.3 define `b_P` only on Hermitian matrices supported on
+  `P`, via `(L_{√P}+R_{√P})⁻¹` on `(ker P)^⊥`.
+- Formalization: `matCost P K` is the variational supremum
+  `(3/2) sup_X {2 Re⟨K,X⟩ − Re⟨X,√P X + X √P⟩}` in `[0,∞]`; it equals the blueprint's cost for
+  supported `K` (eigenbasis formula `matCost_eq_sum`) and is `∞` otherwise. Kernel/support
+  statements of Lemma 3.1 (`ker R*R = ker R`, extension by zero) are therefore not needed and
+  are not formalized separately; the equality of positive spectra is formalized as
+  `trF f (R*R) = trF f (RR*)` for `f 0 = 0`.
+- Resolution: equivalent reformulation, no change to any main result.
+
+## 2026-10-08T22:43:00-04:00 — §3–§5 proof route: regularization by `η > 0`
+
+- Source: Lemmas 3.2, 4.1 differentiate `Φ = tr P^{3/2}` on a fixed support (inverse function
+  theorem for `A ↦ A²`).
+- Formalization: derivatives of the square root are obtained on positive definite matrices
+  from the Sylvester bound `‖BZ+ZA‖ ≥ (α+β)‖Z‖`, and the heat-flow argument is run with the
+  regularized energy `Φ_η(P) = tr((P+η)^{3/2} − η^{3/2})`, `η > 0`; the unregularized cost
+  is recovered by monotone convergence `η ↓ 0` where needed (Lemma 5.3).
+- Resolution: change of proof route only; statements of the source lemmas used downstream are
+  unchanged.
+
+## 2026-10-08T22:58:00-04:00 — Lemma 3.2 (M02), operator monotonicity
+
+- Source: proof of Lemma 3.2 proves operator monotonicity of inversion and of the square root
+  (integral formula), then inverts `L_{√P}+R_{√P}`.
+- Formalization: operator monotonicity of `CFC.sqrt` is Mathlib's `CFC.sqrt_le_sqrt`; with the
+  variational cost no inversion is needed, so monotonicity of inversion is not formalized.
+- Resolution: change of proof route only.
+
+## 2026-10-08T23:12:00-04:00 — Lemma 3.4 (M04), energy-change identity
+
+- Source: Lemma 3.4 states `Φ(R₊*R₊) − Φ(R₋*R₋) = 3∫₀¹ Re⟨R(z)√(R(z)*R(z)), D⟩ dz`; its proof
+  establishes the `η`-regularized identity and lets `η ↓ 0`.
+- Formalization: `energyReg_segment_change` proves the regularized identity for every `η > 0`
+  (this is what the regularized heat-flow argument consumes); the entry estimate is proved
+  for all `η ≥ 0`, including the blueprint's `η = 0`. The `η ↓ 0` limit of the identity is not
+  needed downstream and is not formalized.
+- Resolution: open only as an unused corollary; no effect on the main results.
+
+## 2026-10-08T23:47:00-04:00 — Lemma 3.5 (M05), spaces `H_v`
+
+- Source: Lemma 3.5 allows three different finite-dimensional spaces `H₀, H₁, H₂`.
+- Formalization: `cyclic_trace_control` takes all `H_v` equal to one finite index type, which
+  is the only case used (§4: all arrays are indexed by the same mesh nodes).
+- Resolution: specialization of an intermediate lemma to its use case; no effect on main
+  results.
+
+## 2026-10-09T00:50:45-04:00 — §4 (H01–H03), coordinates, regularization and integrated form
+
+- Source: §4.1 integrates over planes `Π_d` and then against `g_{βs}(d) dd`; Lemma 4.1 states
+  identities for `J_v(d,s)`; Lemma 4.3 states `-J̄'(s) ≥ c_* Σ_v V̄_v(s)`; H02 compares
+  costs of `Φ` on the (possibly singular) Grams.
+- Formalization:
+  - All plane averages are written as integrals over `ℝ³` of `g_{βs}(p₀+p₁+p₂) H(p)`
+    (the change of variables `(p₀, p₁, d) ↦ (p₀, p₁, d−p₀−p₁)` has Jacobian one), so
+    `J̄` and `V̄_v` are `HeatData.Jbar` and `HeatData.Vbar`. The plane identities of
+    Lemma 4.1 appear as `vertex_identities` (integration by parts in single centers,
+    `integral_mul_deriv_coord`), which is the form in which the proof of Lemma 4.3 uses them.
+  - All Grams carry the regularization `η > 0` (see the entry of 2026-10-08T22:43);
+    H02 is `neighbor_cost_comparison` for `T+η`, `S+η`.
+  - Lemma 4.3 is proved in integrated form
+    `(1/28) ∫_{sa}^{sb} Σ_v V̄_v ≤ J̄(sa) − J̄(sb)` for `0 < sa ≤ sb`
+    (`smeared_plane_dissipation`), which is exactly what Lemma 5.2 uses; rates are assumed
+    to satisfy `α_k ∈ {1, 11/10}`, `Σ α = 16/5` (permutations of `(1, λ, λ)`).
+  - The `s`-derivative of `e_v` along `σ = αs` is obtained from a general variance-curve
+    derivative on the `T`-side whose column parts are identified with the `S`-side partial
+    derivatives by uniqueness of derivatives (`tr32_Mnext_eq`, `tr32_Mprev_eq`).
+  - Domination is by `C φ_v(p)²`, `φ_v = E(p_v)(E(p_{v+1}) + E(p_{v−1}))`, combined with the
+    averaging Gaussian into `C ∏_k e^{−ε p_k²}` (`phi_sq_mul_exp_le`); costs are bounded
+    crudely by `(3/4)‖K‖²_HS/√η`, which suffices for integrability at fixed `η`.
+- Resolution: equivalent reformulations / change of proof route; Lemma 4.3 in integrated
+  form is the form consumed downstream.
+
+## 2026-10-09T01:04:02-04:00 — Lemma 4.4 (H04), form of the statement
+
+- Source: Lemma 4.4 states `∫_{Π_d} ‖W_v‖³_HS dπ_d ≤ M n_v³` for every `d`, and then
+  `J̄(s) ≤ 2√2 M Σ n_v³` for `s ≥ h²`; entries may be replaced by smaller ones.
+- Formalization: the weight-sum bound (`sum_gweight_le`, nodes `uᵢ = h kᵢ` with distinct
+  integers `kᵢ`), the weighted Hölder step (`W_cube_le`) and the energy bound
+  (`energy_le_W`) are proved as stated; the plane integration is carried out directly for
+  the `d`-averaged quantity on `ℝ³` (`plane_integral_weights`: the plane integral of
+  `w_v(i) w_{v+1}(j)` averaged against `g_{βs}` is `h²`), giving `Jbar_zero_le` for the
+  unregularized energy (`η = 0`). The per-plane inequality is the same computation before
+  averaging in `d` and is not stated separately. Smaller entries give smaller `n_v`, so the
+  last sentence of the lemma is immediate from the stated bound.
+- Resolution: equivalent reformulation of the consumed statement.
+
+## 2026-10-09T01:50:00-04:00 — Lemma 5.2 (D02), form of the statement
+
+- Source: Lemma 5.2 is stated for the masked arrays `A₀^s(i,j) = A₀(i,j) Σ_ℓ η_ℓ 1_{(u_ℓ,v_ℓ)}(s)`.
+- Formalization: `repeated_mask_integrated_cost` is proved for an arbitrary piecewise-constant
+  family: arrays `A₀ = B_k` on `[t_k, t_{k+1}]` (`h² ≤ t₀`), entries bounded by `|B₀|`, and
+  total variation `Σ_k |B_{k+1}(i,j) − B_k(i,j)| ≤ 2n |B₀(i,j)|`; this is exactly what the
+  proof uses (between switches the arrays are fixed). The reduction of the masks to this form
+  (sorting the switch scales, `|mask| ≤ 1`, total variation `≤ 2n`) is done where the masks
+  are used (Lemma 5.3). The costs on the left are the unregularized costs `b_{T_v}(U_v)` in
+  `[0, ∞]`, obtained from the regularized argument by monotone convergence in `η ↓ 0`
+  (`matCost_le_liminf`) and dominated convergence for `J̄_η → J̄_0` (`tendsto_Jbar`); the
+  `√η` error terms from the entry estimate of Lemma 3.4 vanish in the limit. The constant is
+  explicit: `28 (2√2 M Σ n_v³ + C n (2n₀³ + n₀²n₂ + n₀²n₁))` with `C = 3(1+√(2/π))(30√2)^{2/3}`.
+- Resolution: equivalent reformulation; no change to any main result.
+
+## 2026-10-09T02:30:33-04:00 — Lemma 5.3 (D03), formal statement
+
+- Formalization: `Gaussian_derivative_grid_count` states the bound with the explicit absolute
+  constant `7 · constD03` for nodes `uᵢ = h kᵢ` (distinct integers `kᵢ`), masks given by
+  `IntervalList n s₋ s₊` at each pair (at most `n ≥ 1` disjoint open intervals inside
+  `[s₋, s₊]`, `h² ≤ s₋ < s₊`, coefficients of modulus `≤ 1`), and kernels
+  `Kern m a b t = ∫_a^b s^{m/2} g_{cs}^{(m)}(t) ds/s` with `c = 63/20`. The array norms are
+  `nNorm h A = (h² Σ|A|³)^{1/3}`. The base plane `Π₀` is parametrized by `(p₀, p₁)`; the
+  passage from `Π₀ × ℝ` (shifted centers) to `ℝ³` is a linear change of variables with
+  determinant one (`lintegral_plane_shift`). The scale integral is split along the switch
+  scales (`mask_partition`), and Lemma 5.2 is applied on the pieces.
+- Resolution: faithful; constants made explicit.
+
+## 2026-10-09T03:20:00-04:00 — Theorem 6.1 (E01), formal statement and proof route
+
+- Formalization: `Euclidean_counting_bound` states `∃ C ≥ 0, ∀ m ∈ {3,4}, ∀ n ≥ 1, ∀ F G`
+  measurable in `L³(ℝ²)`: `(∫⁻ S_n^{(m)}(F,G)^{3/2})^{2/3} ≤ C √n ‖F‖₃ ‖G‖₃`, where
+  `S_n^{(m)}` is the supremum (`countingSup`, values in `[0,∞]`) over the countable type
+  `RatIntervalList n` of lists of at most `n` pairwise disjoint open intervals with positive
+  rational endpoints. Measurability of `F, G` (rather than a.e. strong measurability) is
+  assumed; this is harmless since `B_K(F,G)` is defined pointwise by an integral and every use
+  (F01) supplies measurable functions. Explicit constant `C = 14 · constD03`.
+- Proof route: as in the blueprint, with two simplifications. (i) The Euclidean change of
+  variables is avoided: the D03 arrays are sampled directly so that the mesh triple sum is the
+  lattice sum of `H(x,y) F(x+t,y) G(x,y+t) K(t)` (a unimodular reindexing of `ℤ³`), and node A04
+  is applied in the coordinates `(x,y,t)`. (ii) The phase grid is the four units `iʲ`
+  (`|z| ≤ 2 max_j Re(iʲ z)`), which costs a factor `2` in the constant instead of a limit
+  `δ ↓ 0`. The measurable maximizing selector is the least maximizing index
+  (`exists_measurable_argmax`).
+- Resolution: faithful; constants explicit.
+
+## 2026-10-09T03:20:00-04:00 — §7–§10 packaging and constants
+
+- The flows of §7 are `CommutingFlows ν U V`: joint measurability, measure preservation for each
+  `t`, the additive group laws and commutation at every point. `U⁰ = id` is not required: for
+  the suspension of T01 (on `X × ℝ × ℝ` with Lebesgue measure restricted to `[0,1)` in the two
+  real coordinates) it holds only almost everywhere, and no proof uses it.
+- Intermediate statements (`E01Statement`, `F01Statement`, `E02Statement`, `S01Statement`,
+  `S02Statement`, `InvertibleBoundedConvergence`, `BoundedCaseTheorem`) are `Prop`
+  definitions used to connect the section files; each is discharged by a proved theorem
+  (`E01_holds`, `flow_counting_bound`, `E02_holds`, `S01_holds`, `S02_holds`,
+  `invertible_commuting_averages_ae S02_holds`, `bounded_case_theorem`), and the main theorem
+  `commuting_ergodic_averages_converge_main` is unconditional.
+- T04: the measure on the inverse limit is obtained as a cluster point (Prokhorov compactness of
+  probability measures on a compact metrizable space) of the laws of the finite histories,
+  instead of the blueprint's consistency + Riesz–Markov (F6) + A07 construction; every required
+  property is a closed condition satisfied by the approximants. A07 is proved (§2) but not used.
+- T06: constant `10` instead of `6` (the D01 weak-type constant proved in §5 is `5`, not `3`);
+  T07: constant `20`. The constants are immaterial for T08.
+- T08: the `L^r` part asserts the existence of an `L^r` limit (as the statement requires); its
+  identification with the almost-everywhere limit (blueprint's Fatou remark) is not formalized.
+  The approximation of `f, g` uses bounded measurable (simple-function) approximants instead of
+  truncations; only norm convergence of the approximants is used.
+- Resolution: faithful; no change to any main result.

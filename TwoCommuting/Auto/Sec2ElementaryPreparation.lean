@@ -22,4 +22,1490 @@ the integrable-kernel bilinear bound, and uniqueness of compact Borel measures.
 
 namespace Auto
 
+open MeasureTheory Filter Topology Set
+open scoped ContDiff ENNReal NNReal symmDiff
+
+noncomputable section
+
+/-! ### Node A01: differentiation under the integral -/
+
+section A01
+
+variable {E F Z : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E] [FiniteDimensional ℝ E]
+  [NormedAddCommGroup F] [NormedSpace ℝ F] [CompleteSpace F] [MeasurableSpace Z]
+  {ν : Measure Z}
+
+omit [CompleteSpace F] in
+/-- Helper for Lemma 2.1 (node A01): a continuous linear map on a finite-dimensional space is
+recovered from its values on a basis. -/
+lemma clm_eq_sum_basis {ι : Type*} [Fintype ι] (b : Module.Basis ι ℝ E) (L : E →L[ℝ] F) :
+    L = ∑ i, (LinearMap.toContinuousLinearMap (b.coord i)).smulRight (L (b i)) := by
+  ext v
+  simp only [FunLike.coe_sum, Finset.sum_apply,
+    ContinuousLinearMap.smulRight_apply, LinearMap.coe_toContinuousLinearMap',
+    Module.Basis.coord_apply]
+  conv_lhs => rw [← b.sum_repr v]
+  rw [map_sum]
+  exact Finset.sum_congr rfl fun i _ => map_smul L _ _
+
+omit [CompleteSpace F] in
+/-- Helper for Lemma 2.1 (node A01): measurability in the integration variable of the
+derivative in the parameter. The derivative at `a` is a pointwise limit of difference
+quotients, each measurable by hypothesis. -/
+lemma aestronglyMeasurable_fderiv_param {h : E → Z → F} {U : Set E} {a : E} (hU : U ∈ 𝓝 a)
+    (hmeas : ∀ b ∈ U, AEStronglyMeasurable (h b) ν)
+    (hdiff : ∀ᵐ z ∂ν, DifferentiableAt ℝ (fun b => h b z) a) :
+    AEStronglyMeasurable (fun z => fderiv ℝ (fun b => h b z) a) ν := by
+  classical
+  have hdir : ∀ v : E, AEStronglyMeasurable (fun z => fderiv ℝ (fun b => h b z) a v) ν := by
+    intro v
+    let q : ℕ → Z → F := fun n z =>
+      if a + ((n : ℝ))⁻¹ • v ∈ U then (n : ℝ) • (h (a + ((n : ℝ))⁻¹ • v) z - h a z)
+      else 0
+    have hq : ∀ n, AEStronglyMeasurable (q n) ν := by
+      intro n
+      by_cases hn : a + ((n : ℝ))⁻¹ • v ∈ U
+      · simp only [q, hn, ite_true]
+        exact ((hmeas _ hn).sub (hmeas a (mem_of_mem_nhds hU))).const_smul _
+      · simp only [q, hn, ite_false]
+        exact aestronglyMeasurable_const
+    have hev : ∀ᶠ n : ℕ in atTop, a + ((n : ℝ))⁻¹ • v ∈ U := by
+      have h1 : Tendsto (fun n : ℕ => a + ((n : ℝ))⁻¹ • v) atTop (𝓝 a) := by
+        have : Tendsto (fun n : ℕ => ((n : ℝ))⁻¹) atTop (𝓝 0) :=
+          tendsto_inv_atTop_zero.comp tendsto_natCast_atTop_atTop
+        simpa using tendsto_const_nhds.add (this.smul_const v)
+      exact h1 hU
+    refine aestronglyMeasurable_of_tendsto_ae atTop hq ?_
+    filter_upwards [hdiff] with z hz
+    have hlim := hz.hasFDerivAt.lim v (c := fun n : ℕ => (n : ℝ))
+      (tendsto_norm_atTop_atTop.comp tendsto_natCast_atTop_atTop)
+    refine hlim.congr' ?_
+    filter_upwards [hev] with n hn
+    simp [q, hn]
+  let b := Module.finBasis ℝ E
+  have : (fun z => fderiv ℝ (fun b => h b z) a) = fun z =>
+      ∑ i, (LinearMap.toContinuousLinearMap (b.coord i)).smulRight
+        (fderiv ℝ (fun b => h b z) a (b i)) := by
+    funext z
+    exact clm_eq_sum_basis b _
+  rw [this]
+  refine Finset.aestronglyMeasurable_fun_sum _ fun i _ => ?_
+  have hc : Continuous fun w : F =>
+      (LinearMap.toContinuousLinearMap (b.coord i)).smulRight w := by
+    fun_prop
+  exact hc.comp_aestronglyMeasurable (hdir (b i))
+
+omit [CompleteSpace F] in
+/-- Helper for Lemma 2.1 (node A01): the first-order case, at one point `a`, with a
+dominating function for the first derivative on a neighbourhood `B` of `a`. -/
+lemma hasFDerivAt_integral_param {h : E → Z → F} {U : Set E} (hU : IsOpen U)
+    (hmeas : ∀ b ∈ U, AEStronglyMeasurable (h b) ν)
+    (hdiff : ∀ᵐ z ∂ν, DifferentiableOn ℝ (fun b => h b z) U) {a : E} (ha : a ∈ U)
+    {B : Set E} (hB : B ∈ 𝓝 a) (hBU : B ⊆ U) {H : Z → ℝ} (hH : Integrable H ν)
+    (hbound : ∀ᵐ z ∂ν, ∀ b ∈ B, ‖fderiv ℝ (fun b => h b z) b‖ ≤ H z)
+    (hint : Integrable (h a) ν) :
+    HasFDerivAt (fun b => ∫ z, h b z ∂ν) (∫ z, fderiv ℝ (fun b => h b z) a ∂ν) a := by
+  refine hasFDerivAt_integral_of_dominated_of_fderiv_le hB
+    (Filter.eventually_of_mem (hU.mem_nhds ha) hmeas) hint
+    (aestronglyMeasurable_fderiv_param (hU.mem_nhds ha) hmeas
+      (hdiff.mono fun z hz => hz.differentiableAt (hU.mem_nhds ha))) hbound hH ?_
+  filter_upwards [hdiff] with z hz x hx
+  exact (hz.differentiableAt (hU.mem_nhds (hBU hx))).hasFDerivAt
+
+omit [FiniteDimensional ℝ E] in
+/-- Helper for Lemma 2.1 (node A01): the zeroth iterated derivative commutes with the
+integral. -/
+lemma iteratedFDeriv_zero_integral (h : E → Z → F) (a : E) :
+    iteratedFDeriv ℝ 0 (fun b => ∫ z, h b z ∂ν) a =
+      ∫ z, iteratedFDeriv ℝ 0 (fun b => h b z) a ∂ν := by
+  simp only [iteratedFDeriv_zero_eq_comp, Function.comp_apply]
+  exact ((continuousMultilinearCurryFin0 ℝ E F).symm.toLinearIsometry.integral_comp_comm _).symm
+
+/-- Helper for Lemma 2.1 (node A01): a linear isometric equivalence commutes with the
+Bochner integral. -/
+lemma linearIsometryEquiv_integral {G G' : Type*} [NormedAddCommGroup G] [NormedSpace ℝ G]
+    [NormedAddCommGroup G'] [NormedSpace ℝ G'] [CompleteSpace G] [CompleteSpace G']
+    (e : G ≃ₗᵢ[ℝ] G') (φ : Z → G) :
+    e (∫ z, φ z ∂ν) = ∫ z, e (φ z) ∂ν :=
+  (e.toLinearIsometry.integral_comp_comm φ).symm
+
+omit [FiniteDimensional ℝ E] [CompleteSpace F] in
+/-- Helper for Lemma 2.1 (node A01): on an open set, iterated derivatives of order `< k` of a
+`C^k` function are differentiable. -/
+lemma differentiableOn_iteratedFDeriv_of_isOpen {f : E → F} {U : Set E} (hU : IsOpen U)
+    {k m : ℕ} (hf : ContDiffOn ℝ k f U) (hm : m < k) :
+    DifferentiableOn ℝ (iteratedFDeriv ℝ m f) U :=
+  (hf.differentiableOn_iteratedFDerivWithin (by exact_mod_cast hm) hU.uniqueDiffOn).congr
+    fun _ hx => (iteratedFDerivWithin_of_isOpen m hU hx).symm
+
+omit [FiniteDimensional ℝ E] [CompleteSpace F] in
+/-- Helper for Lemma 2.1 (node A01): on an open set, iterated derivatives of order `≤ k` of a
+`C^k` function are continuous. -/
+lemma continuousOn_iteratedFDeriv_of_isOpen {f : E → F} {U : Set E} (hU : IsOpen U)
+    {k m : ℕ} (hf : ContDiffOn ℝ k f U) (hm : m ≤ k) :
+    ContinuousOn (iteratedFDeriv ℝ m f) U :=
+  (hf.continuousOn_iteratedFDerivWithin (by exact_mod_cast hm) hU.uniqueDiffOn).congr
+    fun _ hx => (iteratedFDerivWithin_of_isOpen m hU hx).symm
+
+/-- **Lemma 2.1 (node A01), differentiation under the integral.**
+Let `U` be open in a finite-dimensional real space `E`, let `(Z, ν)` be a measure space and
+`h : E → Z → F` with values in a real Banach space (e.g. `ℂ` or a space of matrices). Assume
+that `h a` is a.e. strongly measurable and integrable for every `a ∈ U`, that outside a fixed
+null set `h(·, z)` is `C^k` on `U` (`k ≥ 1`), and that around each `a ∈ U` there are a
+neighbourhood `B ⊆ U` and an integrable `H_B` dominating all derivatives of orders `1, …, k`
+on `B`. Then `a ↦ ∫ h(a, z) dν(z)` is `C^k` on `U`, and its derivatives of order `≤ k` are
+the integrals of the corresponding derivatives of `h`.
+
+Formalization note: the derivatives are iterated Fréchet derivatives rather than partial
+derivatives; in finite dimension bounds on all partial derivatives of order `i` and on the
+`i`-th Fréchet derivative are equivalent up to dimensional constants. Section measurability
+for each `a` replaces joint measurability (a weaker hypothesis). -/
+theorem integral_differentiation_local_domination {h : E → Z → F} {U : Set E} (hU : IsOpen U)
+    {k : ℕ} (hk : 1 ≤ k)
+    (hmeas : ∀ a ∈ U, AEStronglyMeasurable (h a) ν)
+    (hint : ∀ a ∈ U, Integrable (h a) ν)
+    (hsmooth : ∀ᵐ z ∂ν, ContDiffOn ℝ k (fun b => h b z) U)
+    (hdom : ∀ a ∈ U, ∃ B ∈ 𝓝 a, B ⊆ U ∧ ∃ H : Z → ℝ, Integrable H ν ∧
+      ∀ᵐ z ∂ν, ∀ b ∈ B, ∀ i : ℕ, 1 ≤ i → i ≤ k →
+        ‖iteratedFDeriv ℝ i (fun b => h b z) b‖ ≤ H z) :
+    ContDiffOn ℝ k (fun a => ∫ z, h a z ∂ν) U ∧
+      ∀ a ∈ U, ∀ i : ℕ, i ≤ k → iteratedFDeriv ℝ i (fun a => ∫ z, h a z ∂ν) a =
+        ∫ z, iteratedFDeriv ℝ i (fun b => h b z) a ∂ν := by
+  -- the integrated iterated derivatives
+  set p : E → FormalMultilinearSeries ℝ E F := fun a i =>
+    ∫ z, iteratedFDeriv ℝ i (fun b => h b z) a ∂ν with hp
+  -- a.e. differentiability of the iterated derivatives
+  have hdiffm : ∀ m : ℕ, m < k → ∀ᵐ z ∂ν,
+      DifferentiableOn ℝ (iteratedFDeriv ℝ m (fun b => h b z)) U := fun m hm =>
+    hsmooth.mono fun z hz => differentiableOn_iteratedFDeriv_of_isOpen hU hz hm
+  -- measurability of the iterated derivatives in `z`
+  have hmeasm : ∀ m : ℕ, m ≤ k → ∀ b ∈ U,
+      AEStronglyMeasurable (fun z => iteratedFDeriv ℝ m (fun c => h c z) b) ν := by
+    intro m
+    induction m with
+    | zero =>
+      intro _ b hb
+      simp only [iteratedFDeriv_zero_eq_comp, Function.comp_apply]
+      exact (continuousMultilinearCurryFin0 ℝ E F).symm.continuous.comp_aestronglyMeasurable
+        (hmeas b hb)
+    | succ m ihm =>
+      intro hm b hb
+      simp only [iteratedFDeriv_succ_eq_comp_left, Function.comp_apply]
+      refine (continuousMultilinearCurryLeftEquiv ℝ (fun _ : Fin (m + 1) => E)
+        F).symm.continuous.comp_aestronglyMeasurable ?_
+      exact aestronglyMeasurable_fderiv_param (h := fun c z => iteratedFDeriv ℝ m
+        (fun c => h c z) c) (hU.mem_nhds hb) (ihm (by omega))
+        ((hdiffm m (by omega)).mono fun z hz => hz.differentiableAt (hU.mem_nhds hb))
+  -- integrability of the iterated derivatives
+  have hintm : ∀ m : ℕ, m ≤ k → ∀ b ∈ U,
+      Integrable (fun z => iteratedFDeriv ℝ m (fun c => h c z) b) ν := by
+    intro m hm b hb
+    rcases Nat.eq_zero_or_pos m with rfl | hm0
+    · simp only [iteratedFDeriv_zero_eq_comp, Function.comp_apply]
+      exact ((continuousMultilinearCurryFin0 ℝ E F).symm.toContinuousLinearEquiv
+        |>.toContinuousLinearMap).integrable_comp (hint b hb)
+    · obtain ⟨B, hB, hBU, H, hH, hbd⟩ := hdom b hb
+      refine hH.mono' (hmeasm m hm b hb) ?_
+      filter_upwards [hbd] with z hz using hz b (mem_of_mem_nhds hB) m hm0 hm
+  -- derivative of the integrated `m`-th derivative
+  have hder : ∀ m : ℕ, m < k → ∀ a ∈ U,
+      HasFDerivAt (fun x => p x m) (p a m.succ).curryLeft a := by
+    intro m hm a ha
+    obtain ⟨B, hB, hBU, H, hH, hbd⟩ := hdom a ha
+    have key := hasFDerivAt_integral_param (h := fun c z => iteratedFDeriv ℝ m
+        (fun c => h c z) c) hU (hmeasm m hm.le) (hdiffm m hm) ha hB hBU hH ?_
+        (hintm m hm.le a ha)
+    · convert key using 1
+      have : (p a m.succ).curryLeft =
+          continuousMultilinearCurryLeftEquiv ℝ (fun _ : Fin (m + 1) => E) F (p a m.succ) := rfl
+      rw [this, hp]
+      dsimp only
+      refine (linearIsometryEquiv_integral
+        (G := ContinuousMultilinearMap ℝ (fun _ : Fin (m + 1) => E) F)
+        (G' := E →L[ℝ] ContinuousMultilinearMap ℝ (fun _ : Fin m => E) F)
+        (Z := Z) (ν := ν) (continuousMultilinearCurryLeftEquiv ℝ (fun _ : Fin (m + 1) => E) F)
+        (fun z => iteratedFDeriv ℝ (m + 1) (fun b => h b z) a)).trans ?_
+      congr 1
+    · filter_upwards [hbd] with z hz b hbB
+      rw [norm_fderiv_iteratedFDeriv]
+      exact hz b hbB (m + 1) (by omega) (by omega)
+  have htaylor : HasFTaylorSeriesUpToOn (k : ℕ∞) (fun a => ∫ z, h a z ∂ν) p U := by
+    refine ⟨?_, ?_, ?_⟩
+    · intro a ha
+      rw [hp]
+      dsimp only
+      simp only [iteratedFDeriv_zero_eq_comp, Function.comp_apply]
+      rw [← linearIsometryEquiv_integral]
+      simp
+    · intro m hm a ha
+      exact (hder m (by exact_mod_cast hm) a ha).hasFDerivWithinAt
+    · intro m hm
+      have hm' : m ≤ k := by exact_mod_cast hm
+      rcases Nat.eq_zero_or_pos m with rfl | hm0
+      · intro a ha
+        exact (hder 0 (by omega) a ha).continuousAt.continuousWithinAt
+      · intro a ha
+        obtain ⟨B, hB, hBU, H, hH, hbd⟩ := hdom a ha
+        refine (continuousAt_of_dominated (bound := H) ?_ ?_ hH ?_).continuousWithinAt
+        · filter_upwards [hU.mem_nhds ha] with b hb using hmeasm m hm' b hb
+        · filter_upwards [hB] with b hbB
+          filter_upwards [hbd] with z hz using hz b hbB m hm0 hm'
+        · filter_upwards [hsmooth] with z hz
+          exact ((continuousOn_iteratedFDeriv_of_isOpen hU hz hm') a ha).continuousAt
+            (hU.mem_nhds ha)
+  refine ⟨by exact_mod_cast htaylor.contDiffOn, ?_⟩
+  intro a ha i hi
+  have := htaylor.eq_iteratedFDerivWithin_of_uniqueDiffOn (m := i) (by exact_mod_cast hi)
+    hU.uniqueDiffOn ha
+  rw [← iteratedFDerivWithin_of_isOpen i hU ha, ← this]
+
+end A01
+
+/-! ### Node A02: Gaussian identities and domination -/
+
+section A02
+
+open Real
+
+/-- The unnormalized standard Gaussian profile `φ(x) = exp(-x²/2)`, used to express all
+Gaussians `g_σ` of Lemma 2.2 (node A02) by scaling. -/
+def gaussProfile (x : ℝ) : ℝ := Real.exp (-(x ^ 2) / 2)
+
+/-- The `j`-th derivative `φ^{(j)}` of the standard Gaussian profile (helper for node A02). -/
+def gaussProfileD (j : ℕ) : ℝ → ℝ := iteratedDeriv j gaussProfile
+
+lemma contDiff_gaussProfile : ContDiff ℝ ∞ gaussProfile := by
+  unfold gaussProfile
+  fun_prop
+
+lemma contDiff_gaussProfileD (j : ℕ) : ContDiff ℝ ∞ (gaussProfileD j) := by
+  unfold gaussProfileD
+  rw [iteratedDeriv_eq_iterate]
+  exact contDiff_gaussProfile.iterate_deriv j
+
+lemma differentiable_gaussProfileD (j : ℕ) : Differentiable ℝ (gaussProfileD j) :=
+  (contDiff_gaussProfileD j).differentiable (by simp)
+
+lemma deriv_gaussProfileD (j : ℕ) : deriv (gaussProfileD j) = gaussProfileD (j + 1) := by
+  unfold gaussProfileD
+  rw [iteratedDeriv_succ]
+
+lemma hasDerivAt_gaussProfileD (j : ℕ) (x : ℝ) :
+    HasDerivAt (gaussProfileD j) (gaussProfileD (j + 1) x) x := by
+  rw [← deriv_gaussProfileD]
+  exact (differentiable_gaussProfileD j x).hasDerivAt
+
+lemma gaussProfileD_zero : gaussProfileD 0 = gaussProfile := by
+  simp [gaussProfileD]
+
+lemma gaussProfileD_one (x : ℝ) : gaussProfileD 1 x = -x * gaussProfile x := by
+  have h : HasDerivAt gaussProfile (-x * gaussProfile x) x := by
+    unfold gaussProfile
+    have := ((hasDerivAt_pow 2 x).neg.div_const 2).exp
+    convert this using 1
+    simp; ring
+  rw [← h.deriv, ← deriv_gaussProfileD, gaussProfileD_zero]
+
+/-- Helper for node A02: the three-term recurrence
+`φ^{(j+2)}(x) = -(j+1) φ^{(j)}(x) - x φ^{(j+1)}(x)`, a consequence of `φ' = -xφ`. -/
+lemma gaussProfileD_succ_succ (j : ℕ) (x : ℝ) :
+    gaussProfileD (j + 2) x = -((j : ℝ) + 1) * gaussProfileD j x - x * gaussProfileD (j + 1) x := by
+  induction j generalizing x with
+  | zero =>
+    have h1 : gaussProfileD 1 = fun x => -x * gaussProfileD 0 x := by
+      funext y; rw [gaussProfileD_one, gaussProfileD_zero]
+    have : HasDerivAt (fun x => -x * gaussProfileD 0 x)
+        (-1 * gaussProfileD 0 x + -x * gaussProfileD 1 x) x :=
+      (hasDerivAt_id x).neg.mul (hasDerivAt_gaussProfileD 0 x)
+    rw [← h1] at this
+    rw [← (hasDerivAt_gaussProfileD 1 x).deriv, this.deriv]
+    push_cast; ring
+  | succ j ih =>
+    have h2 : gaussProfileD (j + 2) = fun x =>
+        -((j : ℝ) + 1) * gaussProfileD j x - x * gaussProfileD (j + 1) x := funext ih
+    have : HasDerivAt (fun x => -((j : ℝ) + 1) * gaussProfileD j x - x * gaussProfileD (j + 1) x)
+        (-((j : ℝ) + 1) * gaussProfileD (j + 1) x -
+          (1 * gaussProfileD (j + 1) x + x * gaussProfileD (j + 2) x)) x :=
+      ((hasDerivAt_gaussProfileD j x).const_mul _).sub
+        ((hasDerivAt_id x).mul (hasDerivAt_gaussProfileD (j + 1) x))
+    rw [← h2] at this
+    rw [← (hasDerivAt_gaussProfileD (j + 2) x).deriv, this.deriv]
+    push_cast; ring
+
+lemma gaussProfile_pos (x : ℝ) : 0 < gaussProfile x := Real.exp_pos _
+
+/-- Helper for node A02: every derivative of the profile is bounded by a polynomial times the
+profile, `|φ^{(j)}(x)| ≤ C (1 + |x|)^j φ(x)`. -/
+lemma abs_gaussProfileD_le (j : ℕ) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ x, |gaussProfileD j x| ≤ C * (1 + |x|) ^ j * gaussProfile x := by
+  induction j using Nat.strong_induction_on with
+  | _ j ih =>
+    match j, ih with
+    | 0, _ => exact ⟨1, zero_le_one, fun x => by
+        simp [gaussProfileD_zero, abs_of_pos (gaussProfile_pos x)]⟩
+    | 1, _ => exact ⟨1, zero_le_one, fun x => by
+        rw [gaussProfileD_one, abs_mul, abs_neg, abs_of_pos (gaussProfile_pos x)]
+        have := gaussProfile_pos x
+        nlinarith [abs_nonneg x]⟩
+    | j + 2, ih =>
+      obtain ⟨C0, hC0, h0⟩ := ih j (by omega)
+      obtain ⟨C1, hC1, h1⟩ := ih (j + 1) (by omega)
+      refine ⟨((j : ℝ) + 1) * C0 + C1, by positivity, fun x => ?_⟩
+      rw [gaussProfileD_succ_succ]
+      have hx : (1 : ℝ) ≤ 1 + |x| := by linarith [abs_nonneg x]
+      have hp := gaussProfile_pos x
+      have e0 := h0 x
+      have e1 := h1 x
+      calc |-((j : ℝ) + 1) * gaussProfileD j x - x * gaussProfileD (j + 1) x|
+          ≤ ((j : ℝ) + 1) * |gaussProfileD j x| + |x| * |gaussProfileD (j + 1) x| := by
+            refine (abs_sub _ _).trans ?_
+            rw [abs_mul, abs_mul, abs_neg, abs_of_pos (by positivity : (0 : ℝ) < (j : ℝ) + 1)]
+        _ ≤ ((j : ℝ) + 1) * (C0 * (1 + |x|) ^ j * gaussProfile x) +
+              (1 + |x|) * (C1 * (1 + |x|) ^ (j + 1) * gaussProfile x) := by
+            gcongr
+            linarith
+        _ ≤ (((j : ℝ) + 1) * C0 + C1) * (1 + |x|) ^ (j + 2) * gaussProfile x := by
+            have hpow : (1 + |x|) ^ j ≤ (1 + |x|) ^ (j + 2) :=
+              pow_le_pow_right₀ hx (by omega)
+            have : (1 + |x|) * (C1 * (1 + |x|) ^ (j + 1) * gaussProfile x) =
+                C1 * (1 + |x|) ^ (j + 2) * gaussProfile x := by ring
+            rw [this]
+            have : ((j : ℝ) + 1) * (C0 * (1 + |x|) ^ j * gaussProfile x) ≤
+                ((j : ℝ) + 1) * (C0 * (1 + |x|) ^ (j + 2) * gaussProfile x) := by
+              gcongr
+            nlinarith
+
+/-- Helper for node A02: `(1 + |x|)^n e^{-x²/2} ≤ n! e² e^{-x²/4}`. -/
+lemma one_add_abs_pow_mul_gaussProfile_le (n : ℕ) (x : ℝ) :
+    (1 + |x|) ^ n * gaussProfile x ≤ n.factorial * Real.exp 2 * Real.exp (-(x ^ 2) / 4) := by
+  have hy : 0 ≤ 1 + |x| := by positivity
+  have h1 : (1 + |x|) ^ n ≤ n.factorial * Real.exp (1 + |x|) := by
+    have := Real.pow_div_factorial_le_exp _ hy n
+    rw [div_le_iff₀ (by positivity)] at this
+    linarith
+  have h2 : Real.exp (1 + |x|) * gaussProfile x ≤ Real.exp 2 * Real.exp (-(x ^ 2) / 4) := by
+    unfold gaussProfile
+    rw [← Real.exp_add, ← Real.exp_add]
+    apply Real.exp_le_exp.mpr
+    have : x ^ 2 = |x| ^ 2 := (sq_abs x).symm
+    nlinarith [sq_nonneg (|x| / 2 - 1)]
+  calc (1 + |x|) ^ n * gaussProfile x ≤ n.factorial * Real.exp (1 + |x|) * gaussProfile x := by
+        gcongr; exact (gaussProfile_pos x).le
+    _ = n.factorial * (Real.exp (1 + |x|) * gaussProfile x) := by ring
+    _ ≤ n.factorial * (Real.exp 2 * Real.exp (-(x ^ 2) / 4)) := by gcongr
+    _ = _ := by ring
+
+/-- Helper for node A02: polynomially weighted derivatives of the profile are dominated by
+`exp(-x²/4)`. -/
+lemma abs_pow_mul_gaussProfileD_le (j m : ℕ) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ x, |x| ^ m * |gaussProfileD j x| ≤ C * Real.exp (-(x ^ 2) / 4) := by
+  obtain ⟨C, hC, h⟩ := abs_gaussProfileD_le j
+  refine ⟨C * (m + j).factorial * Real.exp 2, by positivity, fun x => ?_⟩
+  have hx : |x| ^ m ≤ (1 + |x|) ^ m := by gcongr; linarith
+  calc |x| ^ m * |gaussProfileD j x| ≤ (1 + |x|) ^ m * (C * (1 + |x|) ^ j * gaussProfile x) := by
+        gcongr; exact h x
+    _ = C * ((1 + |x|) ^ (m + j) * gaussProfile x) := by ring
+    _ ≤ C * ((m + j).factorial * Real.exp 2 * Real.exp (-(x ^ 2) / 4)) := by
+        exact mul_le_mul_of_nonneg_left (one_add_abs_pow_mul_gaussProfile_le _ x) hC
+    _ = _ := by ring
+
+
+/-- The Gaussian of variance `σ` from Lemma 2.2 (node A02):
+`g_σ(t) = (2πσ)^{-1/2} e^{-t²/(2σ)}`. -/
+def gaussian (σ t : ℝ) : ℝ := (√(2 * π * σ))⁻¹ * Real.exp (-(t ^ 2) / (2 * σ))
+
+/-- The `j`-th derivative `g_σ^{(j)}` of the Gaussian in the space variable (node A02). -/
+def gaussianD (j : ℕ) (σ : ℝ) : ℝ → ℝ := iteratedDeriv j (gaussian σ)
+
+lemma contDiff_gaussian (σ : ℝ) : ContDiff ℝ ∞ (gaussian σ) := by
+  unfold gaussian
+  fun_prop
+
+lemma gaussianD_zero (σ : ℝ) : gaussianD 0 σ = gaussian σ := by
+  simp [gaussianD]
+
+lemma hasDerivAt_gaussianD (j : ℕ) (σ t : ℝ) :
+    HasDerivAt (gaussianD j σ) (gaussianD (j + 1) σ t) t := by
+  have hd : Differentiable ℝ (gaussianD j σ) :=
+    (contDiff_gaussian σ).differentiable_iteratedDeriv j (by exact_mod_cast WithTop.coe_lt_top _)
+  have : deriv (gaussianD j σ) = gaussianD (j + 1) σ := by
+    unfold gaussianD; rw [iteratedDeriv_succ]
+  rw [← this]
+  exact (hd t).hasDerivAt
+
+lemma continuous_gaussianD (j : ℕ) (σ : ℝ) : Continuous (gaussianD j σ) :=
+  continuous_iff_continuousAt.2 fun t => (hasDerivAt_gaussianD j σ t).continuousAt
+
+/-- Helper for node A02: the Gaussian as a rescaled profile,
+`g_σ(t) = (2π)^{-1/2} σ^{-1/2} φ(σ^{-1/2} t)`. -/
+lemma gaussian_eq_profile {σ : ℝ} (hσ : 0 < σ) :
+    gaussian σ = fun t => (√(2 * π))⁻¹ * (√σ)⁻¹ * gaussProfile ((√σ)⁻¹ * t) := by
+  funext t
+  unfold gaussian gaussProfile
+  have hs : 0 < √σ := Real.sqrt_pos.2 hσ
+  rw [show (2 * π * σ) = (2 * π) * σ by ring, Real.sqrt_mul (by positivity), mul_inv]
+  congr 2
+  rw [mul_pow, inv_pow, Real.sq_sqrt hσ.le]
+  field_simp
+
+/-- Scaling formula for the derivatives (node A02):
+`g_σ^{(j)}(t) = (2π)^{-1/2} σ^{-(j+1)/2} φ^{(j)}(σ^{-1/2} t)`. -/
+lemma gaussianD_eq_profile (j : ℕ) {σ : ℝ} (hσ : 0 < σ) (t : ℝ) :
+    gaussianD j σ t =
+      (√(2 * π))⁻¹ * (√σ)⁻¹ ^ (j + 1) * gaussProfileD j ((√σ)⁻¹ * t) := by
+  unfold gaussianD
+  rw [gaussian_eq_profile hσ]
+  have hcd : ContDiff ℝ j (fun t => gaussProfile ((√σ)⁻¹ * t)) :=
+    (contDiff_gaussProfile.of_le (by exact_mod_cast le_top)).comp (by fun_prop)
+  rw [iteratedDeriv_const_mul (f := fun t => gaussProfile ((√σ)⁻¹ * t)) _ hcd.contDiffAt]
+  rw [iteratedDeriv_comp_const_mul (contDiff_gaussProfile.of_le
+    (by exact_mod_cast le_top)) ((√σ)⁻¹)]
+  simp only [gaussProfileD]
+  ring
+
+/-- **Normalization** (node A02): `∫ g_σ = 1` for `σ > 0`. -/
+theorem integral_gaussian_eq_one {σ : ℝ} (hσ : 0 < σ) : ∫ t, gaussian σ t = 1 := by
+  unfold gaussian
+  rw [integral_const_mul]
+  have : (fun t : ℝ => Real.exp (-(t ^ 2) / (2 * σ))) =
+      fun t => Real.exp (-(1 / (2 * σ)) * t ^ 2) := by
+    funext t; congr 1; ring
+  rw [this, integral_gaussian, div_div_eq_mul_div, div_one]
+  rw [show (π * (2 * σ)) = 2 * π * σ by ring]
+  exact inv_mul_cancel₀ (Real.sqrt_pos.2 (by positivity)).ne'
+
+/-- **Scaling identity** (node A02): `g_{as}^{(j)}(t) = s^{-(j+1)/2} g_a^{(j)}(t/√s)`. -/
+theorem gaussianD_scale (j : ℕ) {a s : ℝ} (ha : 0 < a) (hs : 0 < s) (t : ℝ) :
+    gaussianD j (a * s) t = (√s)⁻¹ ^ (j + 1) * gaussianD j a ((√s)⁻¹ * t) := by
+  rw [gaussianD_eq_profile j (mul_pos ha hs), gaussianD_eq_profile j ha,
+    Real.sqrt_mul ha.le, mul_inv]
+  rw [show (√a)⁻¹ * ((√s)⁻¹ * t) = (√a)⁻¹ * (√s)⁻¹ * t by ring]
+  ring
+
+/-- **Heat identity** (node A02), in the form `∂_σ g_σ^{(j)} = ½ g_σ^{(j+2)}`;
+for `j = 0` this is `2 ∂_σ g_σ = g_σ''`. -/
+theorem hasDerivAt_gaussianD_variance (j : ℕ) {σ : ℝ} (hσ : 0 < σ) (t : ℝ) :
+    HasDerivAt (fun τ => gaussianD j τ t) (gaussianD (j + 2) σ t / 2) σ := by
+  set c := (√(2 * π))⁻¹
+  have hs : 0 < √σ := Real.sqrt_pos.2 hσ
+  -- r(τ) = τ^{-1/2}
+  have hr : HasDerivAt (fun τ => (√τ)⁻¹) (-(1 / 2) * (√σ)⁻¹ ^ 3) σ := by
+    have h1 := (Real.hasDerivAt_sqrt hσ.ne').inv hs.ne'
+    convert h1 using 1
+    have : (√σ) ^ 2 = σ := Real.sq_sqrt hσ.le
+    field_simp
+  have hF : HasDerivAt (fun τ => c * (√τ)⁻¹ ^ (j + 1) * gaussProfileD j ((√τ)⁻¹ * t))
+      (c * (((j + 1 : ℕ) : ℝ) * (√σ)⁻¹ ^ j * (-(1 / 2) * (√σ)⁻¹ ^ 3)) *
+          gaussProfileD j ((√σ)⁻¹ * t) +
+        c * (√σ)⁻¹ ^ (j + 1) *
+          (gaussProfileD (j + 1) ((√σ)⁻¹ * t) * (-(1 / 2) * (√σ)⁻¹ ^ 3 * t))) σ := by
+    have h1 := (hr.pow (j + 1)).const_mul c
+    have h2 := (hasDerivAt_gaussProfileD j ((√σ)⁻¹ * t)).comp σ (hr.mul_const t)
+    convert h1.mul h2 using 1
+    · funext τ; simp [Function.comp]
+    · simp [Function.comp]
+  have hev : (fun τ => gaussianD j τ t) =ᶠ[𝓝 σ]
+      fun τ => c * (√τ)⁻¹ ^ (j + 1) * gaussProfileD j ((√τ)⁻¹ * t) := by
+    filter_upwards [lt_mem_nhds hσ] with τ hτ
+    exact gaussianD_eq_profile j hτ t
+  refine (hF.congr_of_eventuallyEq hev).congr_deriv ?_
+  rw [gaussianD_eq_profile (j + 2) hσ, gaussProfileD_succ_succ]
+  push_cast
+  ring
+
+
+/-- **Domination** (node A02): polynomially weighted Gaussian derivatives are bounded by a
+Gaussian of twice the variance, uniformly in the variance:
+`|t|^m |g_σ^{(j)}(t)| ≤ C σ^{m/2} σ^{-(j+1)/2} e^{-t²/(4σ)}`. -/
+theorem abs_pow_mul_gaussianD_le (j m : ℕ) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ σ : ℝ, 0 < σ → ∀ t : ℝ,
+      |t| ^ m * |gaussianD j σ t| ≤
+        C * (√σ) ^ m * (√σ)⁻¹ ^ (j + 1) * Real.exp (-(t ^ 2) / (4 * σ)) := by
+  obtain ⟨C, hC, h⟩ := abs_pow_mul_gaussProfileD_le j m
+  refine ⟨(√(2 * π))⁻¹ * C, by positivity, fun σ hσ t => ?_⟩
+  have hs : 0 < √σ := Real.sqrt_pos.2 hσ
+  set x := (√σ)⁻¹ * t with hx
+  have ht : t = √σ * x := by rw [hx]; field_simp
+  have hx2 : -(x ^ 2) / 4 = -(t ^ 2) / (4 * σ) := by
+    simp only [hx]; rw [mul_pow, inv_pow, Real.sq_sqrt hσ.le]; field_simp
+  rw [gaussianD_eq_profile j hσ, abs_mul, abs_mul,
+    abs_of_pos (by positivity : (0:ℝ) < (√(2 * π))⁻¹),
+    abs_of_pos (by positivity : (0:ℝ) < (√σ)⁻¹ ^ (j + 1)), ← hx, ← hx2]
+  have hxt : |t| ^ m = (√σ) ^ m * |x| ^ m := by
+    rw [ht, abs_mul, abs_of_pos hs, mul_pow]
+  rw [hxt]
+  have := h x
+  calc (√σ) ^ m * |x| ^ m * ((√(2 * π))⁻¹ * (√σ)⁻¹ ^ (j + 1) * |gaussProfileD j x|)
+      = (√(2 * π))⁻¹ * (√σ) ^ m * (√σ)⁻¹ ^ (j + 1) * (|x| ^ m * |gaussProfileD j x|) := by ring
+    _ ≤ (√(2 * π))⁻¹ * (√σ) ^ m * (√σ)⁻¹ ^ (j + 1) * (C * Real.exp (-(x ^ 2) / 4)) := by
+        gcongr
+    _ = _ := by ring
+
+/-- Helper for node A02: `e^{-t²/(4σ)}` is integrable. -/
+lemma integrable_exp_neg_sq_div {σ : ℝ} (hσ : 0 < σ) :
+    Integrable (fun t : ℝ => Real.exp (-(t ^ 2) / (4 * σ))) := by
+  have : (fun t : ℝ => Real.exp (-(t ^ 2) / (4 * σ))) =
+      fun t => Real.exp (-(1 / (4 * σ)) * t ^ 2) := by
+    funext t; congr 1; ring
+  rw [this]
+  exact integrable_exp_neg_mul_sq (by positivity)
+
+/-- **Integrability** (node A02): `t^m g_σ^{(j)}(t)` is integrable for `σ > 0`. -/
+theorem integrable_pow_mul_gaussianD (j m : ℕ) {σ : ℝ} (hσ : 0 < σ) :
+    Integrable (fun t => t ^ m * gaussianD j σ t) := by
+  obtain ⟨C, hC, h⟩ := abs_pow_mul_gaussianD_le j m
+  refine ((integrable_exp_neg_sq_div hσ).const_mul
+    (C * (√σ) ^ m * (√σ)⁻¹ ^ (j + 1))).mono'
+    ((continuous_pow m).mul (continuous_gaussianD j σ)).aestronglyMeasurable ?_
+  refine Filter.Eventually.of_forall fun t => ?_
+  rw [Real.norm_eq_abs, abs_mul, abs_pow]
+  exact h σ hσ t
+
+theorem integrable_gaussianD (j : ℕ) {σ : ℝ} (hσ : 0 < σ) : Integrable (gaussianD j σ) := by
+  simpa using integrable_pow_mul_gaussianD j 0 hσ
+
+/-- **Decay** (node A02): `|t|^m g_σ^{(j)}(t) → 0` as `|t| → ∞`. -/
+theorem tendsto_pow_mul_gaussianD (j m : ℕ) {σ : ℝ} (hσ : 0 < σ) :
+    Tendsto (fun t => |t| ^ m * gaussianD j σ t) (Filter.cocompact ℝ) (𝓝 0) := by
+  obtain ⟨C, hC, h⟩ := abs_pow_mul_gaussianD_le j m
+  have hexp : Tendsto (fun t : ℝ => Real.exp (-(t ^ 2) / (4 * σ))) (Filter.cocompact ℝ)
+      (𝓝 0) := by
+    refine Real.tendsto_exp_atBot.comp ?_
+    have h2 : Tendsto (fun t : ℝ => t ^ 2) (Filter.cocompact ℝ) atTop := by
+      have := (Filter.tendsto_pow_atTop (two_ne_zero)).comp
+        (tendsto_norm_cocompact_atTop (E := ℝ))
+      refine this.congr fun t => ?_
+      simp [Real.norm_eq_abs, sq_abs]
+    have : Tendsto (fun t : ℝ => -(t ^ 2) / (4 * σ)) (Filter.cocompact ℝ) atBot := by
+      have := (Filter.tendsto_neg_atTop_atBot.comp h2).atBot_div_const (by positivity : 0 < 4 * σ)
+      simpa [Function.comp] using this
+    exact this
+  have hb := hexp.const_mul (C * (√σ) ^ m * (√σ)⁻¹ ^ (j + 1))
+  rw [mul_zero] at hb
+  refine squeeze_zero_norm (fun t => ?_) hb
+  rw [Real.norm_eq_abs, abs_mul, abs_pow, abs_abs]
+  exact h σ hσ t
+
+/-- **`L¹` scale invariance** (node A02): for fixed `a > 0` and `j`, the `L¹` norm of
+`s^{j/2} g_{as}^{(j)}` does not depend on `s > 0`. (Here `s^{j/2}` is written `(√s)^j`.) -/
+theorem integral_abs_gaussianD_scale (j : ℕ) {a s : ℝ} (ha : 0 < a) (hs : 0 < s) :
+    ∫ t, |(√s) ^ j * gaussianD j (a * s) t| = ∫ t, |gaussianD j a t| := by
+  have hss : 0 < √s := Real.sqrt_pos.2 hs
+  have : (fun t => |(√s) ^ j * gaussianD j (a * s) t|) =
+      fun t => (√s)⁻¹ * |gaussianD j a ((√s)⁻¹ * t)| := by
+    funext t
+    rw [gaussianD_scale j ha hs, abs_mul, abs_mul, abs_of_pos (by positivity : (0:ℝ) < (√s) ^ j),
+      abs_of_pos (by positivity : (0:ℝ) < (√s)⁻¹ ^ (j + 1))]
+    rw [pow_succ, inv_pow]
+    field_simp
+  rw [this, integral_const_mul, Measure.integral_comp_mul_left (fun t => |gaussianD j a t|)]
+  rw [inv_inv, abs_of_pos hss, smul_eq_mul]
+  field_simp
+
+
+/-- Helper for node A02: Gaussian derivatives are bounded. -/
+lemma abs_gaussianD_le_const (j : ℕ) {σ : ℝ} (hσ : 0 < σ) :
+    ∃ M : ℝ, ∀ t, |gaussianD j σ t| ≤ M := by
+  obtain ⟨C, hC, h⟩ := abs_pow_mul_gaussianD_le j 0
+  refine ⟨C * (√σ) ^ 0 * (√σ)⁻¹ ^ (j + 1), fun t => ?_⟩
+  have := h σ hσ t
+  rw [pow_zero, one_mul] at this
+  refine this.trans ?_
+  have : Real.exp (-(t ^ 2) / (4 * σ)) ≤ 1 := by
+    rw [Real.exp_le_one_iff]
+    have : 0 ≤ t ^ 2 / (4 * σ) := by positivity
+    rw [neg_div]; linarith
+  have : 0 ≤ C * (√σ) ^ 0 * (√σ)⁻¹ ^ (j + 1) := by positivity
+  nlinarith [Real.exp_pos (-(t ^ 2) / (4 * σ))]
+
+/-- Helper for node A02: differentiation under the convolution integral with a Gaussian
+derivative, `∂_t ∫ g_σ^{(i)}(t-d) G(d) dd = ∫ g_σ^{(i+1)}(t-d) G(d) dd` for integrable `G`
+(an instance of the domination in Lemma 2.1). -/
+lemma hasDerivAt_gaussianD_conv (i : ℕ) {σ : ℝ} (hσ : 0 < σ) {G : ℝ → ℝ} (hG : Integrable G)
+    (t : ℝ) :
+    HasDerivAt (fun t => ∫ d, gaussianD i σ (t - d) * G d)
+      (∫ d, gaussianD (i + 1) σ (t - d) * G d) t := by
+  obtain ⟨M0, hM0⟩ := abs_gaussianD_le_const i hσ
+  obtain ⟨M1, hM1⟩ := abs_gaussianD_le_const (i + 1) hσ
+  have hint : ∀ (k : ℕ) (M : ℝ), (∀ t, |gaussianD k σ t| ≤ M) → ∀ x : ℝ,
+      Integrable (fun d => gaussianD k σ (x - d) * G d) := by
+    intro k M hM x
+    refine (hG.norm.const_mul M).mono' ?_ ?_
+    · exact ((continuous_gaussianD k σ).comp (continuous_const.sub continuous_id)
+        ).aestronglyMeasurable.mul hG.aestronglyMeasurable
+    · refine Filter.Eventually.of_forall fun d => ?_
+      rw [Real.norm_eq_abs, abs_mul, Real.norm_eq_abs]
+      exact mul_le_mul_of_nonneg_right (hM _) (abs_nonneg _)
+  refine (hasDerivAt_integral_of_dominated_loc_of_deriv_le (bound := fun d => M1 * |G d|)
+    (F := fun t d => gaussianD i σ (t - d) * G d)
+    (F' := fun t d => gaussianD (i + 1) σ (t - d) * G d) (s := Set.univ)
+    Filter.univ_mem ?_ (hint i M0 hM0 t) ?_ ?_ (hG.norm.const_mul M1) ?_).2
+  · exact Filter.Eventually.of_forall fun x => (hint i M0 hM0 x).aestronglyMeasurable
+  · exact (hint (i + 1) M1 hM1 t).aestronglyMeasurable
+  · refine Filter.Eventually.of_forall fun d x _ => ?_
+    rw [Real.norm_eq_abs, abs_mul]
+    exact mul_le_mul_of_nonneg_right (hM1 _) (abs_nonneg _)
+  · refine Filter.Eventually.of_forall fun d x _ => ?_
+    have := ((hasDerivAt_gaussianD i σ (x - d)).comp x
+      ((hasDerivAt_id x).sub_const d)).mul_const (G d)
+    simpa using this
+
+/-- Helper for node A02: iterated derivatives of a Gaussian convolution. -/
+lemma iteratedDeriv_gaussian_conv (i : ℕ) {σ : ℝ} (hσ : 0 < σ) {G : ℝ → ℝ}
+    (hG : Integrable G) :
+    iteratedDeriv i (fun t => ∫ d, gaussian σ (t - d) * G d) =
+      fun t => ∫ d, gaussianD i σ (t - d) * G d := by
+  induction i with
+  | zero => simp [gaussianD_zero]
+  | succ i ih =>
+    rw [iteratedDeriv_succ, ih]
+    funext t
+    exact (hasDerivAt_gaussianD_conv i hσ hG t).deriv
+
+/-- Helper for node A02: the convolution `g_σ * g_τ = g_{σ+τ}`, by completing the square. -/
+lemma gaussian_conv_gaussian {σ τ : ℝ} (hσ : 0 < σ) (hτ : 0 < τ) (t : ℝ) :
+    ∫ d, gaussian σ (t - d) * gaussian τ d = gaussian (σ + τ) t := by
+  set b := (σ + τ) / (2 * σ * τ) with hb
+  have hb0 : 0 < b := by positivity
+  set c := τ / (σ + τ)
+  have hsq : ∀ d : ℝ, gaussian σ (t - d) * gaussian τ d =
+      ((√(2 * π * σ))⁻¹ * (√(2 * π * τ))⁻¹ * Real.exp (-(t ^ 2) / (2 * (σ + τ)))) *
+        Real.exp (-b * (d - c * t) ^ 2) := by
+    intro d
+    unfold gaussian
+    have : Real.exp (-((t - d) ^ 2) / (2 * σ)) * Real.exp (-(d ^ 2) / (2 * τ)) =
+        Real.exp (-(t ^ 2) / (2 * (σ + τ))) * Real.exp (-b * (d - c * t) ^ 2) := by
+      rw [← Real.exp_add, ← Real.exp_add]
+      congr 1
+      simp only [hb, c]
+      field_simp
+      ring
+    calc _ = (√(2 * π * σ))⁻¹ * (√(2 * π * τ))⁻¹ *
+          (Real.exp (-((t - d) ^ 2) / (2 * σ)) * Real.exp (-(d ^ 2) / (2 * τ))) := by ring
+      _ = _ := by rw [this]; ring
+  simp_rw [hsq]
+  rw [integral_const_mul]
+  have hshift : ∫ d : ℝ, Real.exp (-b * (d - c * t) ^ 2) = √(π / b) := by
+    rw [integral_sub_right_eq_self (fun d => Real.exp (-b * d ^ 2)) (c * t), integral_gaussian]
+  rw [hshift]
+  unfold gaussian
+  rw [show ∀ x y z w : ℝ, x * y * z * w = (x * y * w) * z by intros; ring]
+  congr 1
+  -- the constants: `(2πσ)^{-1/2} (2πτ)^{-1/2} (π/b)^{1/2} = (2π(σ+τ))^{-1/2}`
+  rw [← Real.sqrt_inv, ← Real.sqrt_inv, ← Real.sqrt_inv, ← Real.sqrt_mul (by positivity),
+    ← Real.sqrt_mul (by positivity)]
+  congr 1
+  simp only [hb]
+  field_simp
+
+/-- **Gaussian convolution** (Lemma 2.2, node A02): for `σ, τ > 0` and `i, j ≥ 0`,
+`g_σ^{(i)} * g_τ^{(j)} = g_{σ+τ}^{(i+j)}`, where `(F * G)(t) = ∫ F(t-d) G(d) dd`.
+
+Formalization note: instead of integrating by parts, the derivatives are placed on either
+factor by the substitution `d ↦ t - d` and differentiation under the integral. -/
+theorem gaussianD_conv_gaussianD (i j : ℕ) {σ τ : ℝ} (hσ : 0 < σ) (hτ : 0 < τ) (t : ℝ) :
+    ∫ d, gaussianD i σ (t - d) * gaussianD j τ d = gaussianD (i + j) (σ + τ) t := by
+  -- first `i = 0`
+  have h0 : ∀ x, ∫ d, gaussian σ (x - d) * gaussianD j τ d = gaussianD j (σ + τ) x := by
+    intro x
+    have e1 : ∫ d, gaussian σ (x - d) * gaussianD j τ d =
+        ∫ d, gaussianD j τ (x - d) * gaussian σ d := by
+      rw [← integral_sub_left_eq_self (fun d => gaussian σ (x - d) * gaussianD j τ d)
+        (μ := volume) x]
+      simp only [sub_sub_cancel]
+      congr 1; funext d; ring
+    rw [e1]
+    have hgi : Integrable (gaussian σ) := by
+      simpa [gaussianD_zero] using integrable_gaussianD 0 hσ
+    have := congrFun (iteratedDeriv_gaussian_conv j hτ hgi) x
+    rw [← this]
+    have e2 : (fun t => ∫ d, gaussian τ (t - d) * gaussian σ d) = gaussian (σ + τ) := by
+      funext y; rw [gaussian_conv_gaussian hτ hσ, add_comm]
+    rw [e2]
+    rfl
+  have := congrFun (iteratedDeriv_gaussian_conv i hσ (integrable_gaussianD j hτ)) t
+  rw [← this]
+  have e3 : (fun t => ∫ d, gaussian σ (t - d) * gaussianD j τ d) = gaussianD j (σ + τ) :=
+    funext h0
+  rw [e3]
+  unfold gaussianD
+  rw [iteratedDeriv_eq_iterate, iteratedDeriv_eq_iterate, iteratedDeriv_eq_iterate,
+    ← Function.iterate_add_apply]
+
+end A02
+
+/-! ### Node A03: finite measurable choices -/
+
+section A03
+
+/-- A function on the plane is *constant on the grid* generated by finite sets `Xs, Ys` of
+breakpoints if it depends only on the position of each coordinate relative to these
+breakpoints; equivalently, it is constant on every cell of the finite rectangular partition
+generated by the lines `x = a` (`a ∈ Xs`) and `y = b` (`b ∈ Ys`). (Node A03.) -/
+def GridConst {α : Type*} (Xs Ys : Finset ℝ) (f : ℝ × ℝ → α) : Prop :=
+  ∀ p q : ℝ × ℝ, (∀ a ∈ Xs, (p.1 < a ↔ q.1 < a)) → (∀ b ∈ Ys, (p.2 < b ↔ q.2 < b)) →
+    f p = f q
+
+lemma GridConst.mono {α : Type*} {Xs Ys Xs' Ys' : Finset ℝ} {f : ℝ × ℝ → α}
+    (hf : GridConst Xs Ys f) (hX : Xs ⊆ Xs') (hY : Ys ⊆ Ys') : GridConst Xs' Ys' f :=
+  fun p q hx hy => hf p q (fun a ha => hx a (hX ha)) (fun b hb => hy b (hY hb))
+
+lemma GridConst.comp {α β : Type*} {Xs Ys : Finset ℝ} {f : ℝ × ℝ → α}
+    (hf : GridConst Xs Ys f) (g : α → β) : GridConst Xs Ys (g ∘ f) :=
+  fun p q hx hy => by simp [hf p q hx hy]
+
+/-- Sets that are unions of cells of some finite grid (helper for node A03). -/
+def gridSets : Set (Set (ℝ × ℝ)) :=
+  {S | ∃ Xs Ys : Finset ℝ, GridConst Xs Ys (· ∈ S)}
+
+lemma gridSets_binop {S T : Set (ℝ × ℝ)} (hS : S ∈ gridSets) (hT : T ∈ gridSets)
+    (op : Prop → Prop → Prop) : {p | op (p ∈ S) (p ∈ T)} ∈ gridSets := by
+  obtain ⟨X1, Y1, h1⟩ := hS
+  obtain ⟨X2, Y2, h2⟩ := hT
+  refine ⟨X1 ∪ X2, Y1 ∪ Y2, fun p q hx hy => ?_⟩
+  have e1 := (h1.mono Finset.subset_union_left Finset.subset_union_left) p q hx hy
+  have e2 := (h2.mono Finset.subset_union_right Finset.subset_union_right) p q hx hy
+  simp only [Set.mem_ofPred_eq]
+  simp only at e1 e2
+  rw [e1, e2]
+
+lemma isSetRing_gridSets : IsSetRing gridSets where
+  empty_mem := ⟨∅, ∅, fun _ _ _ _ => rfl⟩
+  union_mem := fun _ _ hS hT => gridSets_binop hS hT (· ∨ ·)
+  sdiff_mem := fun _ _ hS hT => gridSets_binop hS hT (fun a b => a ∧ ¬ b)
+
+lemma univ_mem_gridSets : (Set.univ : Set (ℝ × ℝ)) ∈ gridSets :=
+  ⟨∅, ∅, fun _ _ _ _ => rfl⟩
+
+lemma fst_lt_mem_gridSets (a : ℝ) : {p : ℝ × ℝ | p.1 < a} ∈ gridSets :=
+  ⟨{a}, ∅, fun p q hx _ => by simp only [eq_iff_iff]; exact hx a (Finset.mem_singleton_self a)⟩
+
+lemma snd_lt_mem_gridSets (b : ℝ) : {p : ℝ × ℝ | p.2 < b} ∈ gridSets :=
+  ⟨∅, {b}, fun p q _ hy => by simp only [eq_iff_iff]; exact hy b (Finset.mem_singleton_self b)⟩
+
+/-- Helper for node A03: grid sets are Borel. -/
+lemma measurableSet_of_mem_gridSets {S : Set (ℝ × ℝ)} (hS : S ∈ gridSets) : MeasurableSet S := by
+  classical
+  obtain ⟨Xs, Ys, h⟩ := hS
+  let Φ : ℝ × ℝ → (Xs → Bool) × (Ys → Bool) :=
+    fun p => (fun a => decide (p.1 < a), fun b => decide (p.2 < b))
+  have hΦ : Measurable Φ := by
+    refine Measurable.prodMk ?_ ?_
+    · refine measurable_pi_iff.2 fun a => measurable_to_bool ?_
+      have : (fun p : ℝ × ℝ => decide (p.1 < (a : ℝ))) ⁻¹' {true} = {p | p.1 < (a : ℝ)} := by
+        ext p; simp
+      rw [this]
+      exact measurableSet_lt measurable_fst measurable_const
+    · refine measurable_pi_iff.2 fun b => measurable_to_bool ?_
+      have : (fun p : ℝ × ℝ => decide (p.2 < (b : ℝ))) ⁻¹' {true} = {p | p.2 < (b : ℝ)} := by
+        ext p; simp
+      rw [this]
+      exact measurableSet_lt measurable_snd measurable_const
+  have : S = Φ ⁻¹' (Φ '' S) := by
+    ext p
+    constructor
+    · intro hp; exact ⟨p, hp, rfl⟩
+    · rintro ⟨q, hq, hqp⟩
+      have hx : ∀ a ∈ Xs, (q.1 < a ↔ p.1 < a) := fun a ha => by
+        have := congrFun (congrArg Prod.fst hqp) ⟨a, ha⟩
+        simpa [Φ] using this
+      have hy : ∀ b ∈ Ys, (q.2 < b ↔ p.2 < b) := fun b hb => by
+        have := congrFun (congrArg Prod.snd hqp) ⟨b, hb⟩
+        simpa [Φ] using this
+      have := h q p hx hy
+      simp only [eq_iff_iff] at this
+      exact this.1 hq
+  rw [this]
+  exact hΦ (Set.Finite.measurableSet (Set.toFinite _))
+
+/-- Helper for node A03: the grid sets generate the Borel σ-algebra of the plane. -/
+lemma generateFrom_gridSets :
+    (inferInstance : MeasurableSpace (ℝ × ℝ)) = MeasurableSpace.generateFrom gridSets := by
+  apply le_antisymm
+  · have h1 : MeasurableSpace.comap Prod.fst (inferInstance : MeasurableSpace ℝ) ≤
+        MeasurableSpace.generateFrom gridSets := by
+      rw [MeasurableSpace.comap_le_iff_le_map, BorelSpace.measurable_eq (α := ℝ),
+        borel_eq_generateFrom_Iio]
+      refine MeasurableSpace.generateFrom_le ?_
+      rintro _ ⟨a, rfl⟩
+      exact MeasurableSpace.measurableSet_generateFrom (fst_lt_mem_gridSets a)
+    have h2 : MeasurableSpace.comap Prod.snd (inferInstance : MeasurableSpace ℝ) ≤
+        MeasurableSpace.generateFrom gridSets := by
+      rw [MeasurableSpace.comap_le_iff_le_map, BorelSpace.measurable_eq (α := ℝ),
+        borel_eq_generateFrom_Iio]
+      refine MeasurableSpace.generateFrom_le ?_
+      rintro _ ⟨b, rfl⟩
+      exact MeasurableSpace.measurableSet_generateFrom (snd_lt_mem_gridSets b)
+    exact sup_le h1 h2
+  · exact MeasurableSpace.generateFrom_le fun S hS => measurableSet_of_mem_gridSets hS
+
+/-- **Lemma 2.3 (node A03), finite measurable choices.** Let `Q ⊆ ℝ²` have finite Lebesgue
+measure (e.g. a bounded rectangle) and let `c : ℝ² → ι` be a choice from a finite set `ι`
+whose level sets are measurable. Then there is a sequence of choices `cs k`, each constant on
+the cells of a finite rectangular grid, which eventually agrees with `c` at almost every point
+of `Q`. -/
+theorem finite_measurable_menu_rectangular_approximation {ι : Type*} [Finite ι] [Nonempty ι]
+    (c : ℝ × ℝ → ι) (hc : ∀ i, MeasurableSet (c ⁻¹' {i})) {Q : Set (ℝ × ℝ)}
+    (hQ : volume Q ≠ ⊤) :
+    ∃ cs : ℕ → ℝ × ℝ → ι, (∀ k, ∃ Xs Ys : Finset ℝ, GridConst Xs Ys (cs k)) ∧
+      ∀ᵐ p ∂(volume.restrict Q), ∀ᶠ k in atTop, cs k p = c p := by
+  classical
+  have := Fintype.ofFinite ι
+  set μ := volume.restrict Q with hμ
+  have : IsFiniteMeasure μ := isFiniteMeasure_restrict.2 hQ
+  set N : ℕ := Fintype.card ι
+  have hN : 0 < N := Fintype.card_pos
+  -- approximation of each level set at precision `ε k`
+  let ε : ℕ → ℝ≥0∞ := fun k => ((2 : ℝ≥0∞) ^ k * N)⁻¹
+  have hε : ∀ k, 0 < ε k := fun k => ENNReal.inv_pos.2 (ENNReal.mul_ne_top
+    (ENNReal.pow_ne_top ENNReal.ofNat_ne_top) (ENNReal.natCast_ne_top N))
+  have happrox : ∀ k i, ∃ F ∈ gridSets, μ (F ∆ (c ⁻¹' {i})) < ε k := fun k i =>
+    exists_measure_symmDiff_lt_of_generateFrom_isSetRing isSetRing_gridSets
+      ⟨{Set.univ}, Set.countable_singleton _, by simpa using univ_mem_gridSets, by simp⟩
+      generateFrom_gridSets (hc i) (hε k)
+  choose F hFgrid hFμ using happrox
+  -- the rectangular choice: some index among those whose approximating set contains `p`
+  let g : Finset ι → ι := fun S => if h : S.Nonempty then h.choose else Classical.arbitrary ι
+  let cs : ℕ → ℝ × ℝ → ι := fun k p => g (Finset.univ.filter fun i => p ∈ F k i)
+  refine ⟨cs, fun k => ?_, ?_⟩
+  · -- grid constancy, using the union of all breakpoints
+    choose Xs Ys hXY using fun i => hFgrid k i
+    refine ⟨Finset.univ.biUnion Xs, Finset.univ.biUnion Ys, fun p q hx hy => ?_⟩
+    have : (Finset.univ.filter fun i => p ∈ F k i) = Finset.univ.filter fun i => q ∈ F k i := by
+      ext i
+      have := (hXY i).mono (Finset.subset_biUnion_of_mem Xs (Finset.mem_univ i))
+        (Finset.subset_biUnion_of_mem Ys (Finset.mem_univ i)) p q hx hy
+      simp only [eq_iff_iff] at this
+      simp [this]
+    simp only [cs, this]
+  · -- Borel–Cantelli for the disagreement sets
+    let D : ℕ → Set (ℝ × ℝ) := fun k => ⋃ i, F k i ∆ (c ⁻¹' {i})
+    have hD : ∀ k, μ (D k) ≤ ((2 : ℝ≥0∞) ^ k)⁻¹ := by
+      intro k
+      calc μ (D k) ≤ ∑ i, μ (F k i ∆ (c ⁻¹' {i})) := measure_iUnion_fintype_le μ _
+        _ ≤ ∑ _i : ι, ε k := Finset.sum_le_sum fun i _ => (hFμ k i).le
+        _ = N * ε k := by simp [N]
+        _ = ((2 : ℝ≥0∞) ^ k)⁻¹ := by
+          simp only [ε]
+          rw [ENNReal.mul_inv (Or.inl (by simp)) (Or.inl (by simp)), ← mul_assoc, mul_comm,
+            ← mul_assoc, ENNReal.inv_mul_cancel (by simp [hN.ne']) (by simp), one_mul]
+    have hsum : ∑' k, μ (D k) ≠ ⊤ := by
+      refine ne_top_of_le_ne_top ?_ (ENNReal.tsum_le_tsum hD)
+      simp_rw [ENNReal.inv_pow]
+      rw [ENNReal.tsum_geometric, ENNReal.one_sub_inv_two, inv_inv]
+      exact ENNReal.ofNat_ne_top
+    filter_upwards [ae_eventually_notMem hsum] with p hp
+    filter_upwards [hp] with k hk
+    simp only [D, Set.mem_iUnion, not_exists] at hk
+    have hmem : ∀ i, (p ∈ F k i ↔ c p = i) := by
+      intro i
+      have := hk i
+      rw [Set.mem_symmDiff] at this
+      simp only [Set.mem_preimage, Set.mem_singleton_iff, not_or, not_and, not_not] at this
+      exact ⟨fun h => this.1 h, fun h => this.2 h⟩
+    have hS : (Finset.univ.filter fun i => p ∈ F k i) = {c p} := by
+      ext i; simp [hmem i, eq_comm]
+    simp only [cs, hS, g]
+    rw [dite_eq_left_of_eq_true (eq_true (Finset.singleton_nonempty (c p)))]
+    exact Finset.mem_singleton.1 (Finset.singleton_nonempty (c p)).choose_spec
+
+end A03
+
+/-! ### Node A04: lattice sampling -/
+
+section A04
+
+variable {d : ℕ} {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E] [CompleteSpace E]
+
+/-- The lattice point `x_h = h ⌊x/h⌋` (coordinatewise) for the mesh `h = 1/N` (node A04). -/
+def latticeFloor (N : ℕ) (x : Fin d → ℝ) : Fin d → ℝ := fun i => (⌊(N : ℝ) * x i⌋ : ℝ) / N
+
+/-- The half-open lattice cube `hk + [0,h)^d` with `h = 1/N` (node A04). -/
+def latticeCube (N : ℕ) (k : Fin d → ℤ) : Set (Fin d → ℝ) :=
+  Set.pi Set.univ fun i => Set.Ico ((k i : ℝ) / N) (((k i : ℝ) + 1) / N)
+
+lemma mem_latticeCube {N : ℕ} (hN : 0 < N) {k : Fin d → ℤ} {x : Fin d → ℝ} :
+    x ∈ latticeCube N k ↔ ∀ i, ⌊(N : ℝ) * x i⌋ = k i := by
+  have hN' : (0 : ℝ) < N := by exact_mod_cast hN
+  simp only [latticeCube, Set.mem_pi, Set.mem_univ, true_implies, Set.mem_Ico, Int.floor_eq_iff]
+  refine forall_congr' fun i => ?_
+  rw [div_le_iff₀ hN', lt_div_iff₀ hN']
+  constructor <;> rintro ⟨h1, h2⟩ <;> constructor <;> linarith
+
+lemma volume_latticeCube {N : ℕ} (hN : 0 < N) (k : Fin d → ℤ) :
+    volume (latticeCube N k) = ENNReal.ofReal ((N : ℝ)⁻¹) ^ d := by
+  have hN' : (0 : ℝ) < N := by exact_mod_cast hN
+  rw [latticeCube, Real.volume_pi_Ico]
+  have : ∀ i, ((k i : ℝ) + 1) / N - (k i : ℝ) / N = (N : ℝ)⁻¹ := by
+    intro i; field_simp; ring
+  simp_rw [this]
+  simp
+
+lemma abs_sub_latticeFloor_le {N : ℕ} (hN : 0 < N) (x : Fin d → ℝ) (i : Fin d) :
+    |x i - latticeFloor N x i| ≤ (N : ℝ)⁻¹ := by
+  have hN' : (0 : ℝ) < N := by exact_mod_cast hN
+  have h1 := Int.floor_le ((N : ℝ) * x i)
+  have h2 := Int.lt_floor_add_one ((N : ℝ) * x i)
+  simp only [latticeFloor]
+  have key : x i - (⌊(N : ℝ) * x i⌋ : ℝ) / N = ((N : ℝ) * x i - ⌊(N : ℝ) * x i⌋) / N := by
+    field_simp
+  rw [key, abs_div, abs_of_pos hN', div_le_iff₀ hN', inv_mul_cancel₀ hN'.ne', abs_le]
+  constructor <;> linarith
+
+lemma tendsto_latticeFloor (x : Fin d → ℝ) :
+    Tendsto (fun N : ℕ => latticeFloor N x) atTop (𝓝 x) := by
+  rw [tendsto_pi_nhds]
+  intro i
+  have h0 : Tendsto (fun N : ℕ => (N : ℝ)⁻¹) atTop (𝓝 0) :=
+    tendsto_inv_atTop_zero.comp tendsto_natCast_atTop_atTop
+  have : Tendsto (fun N : ℕ => x i - latticeFloor N x i) atTop (𝓝 0) := by
+    refine squeeze_zero_norm' ?_ h0
+    filter_upwards [eventually_gt_atTop 0] with N hN
+    rw [Real.norm_eq_abs]
+    exact abs_sub_latticeFloor_le hN x i
+  have := (tendsto_const_nhds (x := x i)).sub this
+  simpa using this
+
+/-- Helper for node A04: coordinate hyperplanes are Lebesgue-null. -/
+lemma volume_coord_hyperplane (i : Fin d) (a : ℝ) :
+    volume {x : Fin d → ℝ | x i = a} = 0 := by
+  have : {x : Fin d → ℝ | x i = a} =
+      (Function.eval i : (Fin d → ℝ) → ℝ) ⁻¹' ({a} : Set ℝ) := rfl
+  rw [this, volume_pi]
+  exact Measure.pi_eval_preimage_null _ (Real.volume_singleton)
+
+/-- **Lemma 2.4 (node A04), lattice sampling.** Let `H : ℝ^d → E` be bounded, vanish outside a
+bounded set, and be continuous off finitely many coordinate hyperplanes `{x_i = a}`,
+`(i, a) ∈ S`. Then, with mesh `h = 1/N`, `h^d ∑_{k ∈ ℤ^d} H(hk) → ∫ H` as `N → ∞`. Every sum
+is finite (see `lattice_sampling_finite_support`). -/
+theorem lattice_sampling_dominated_convergence (H : (Fin d → ℝ) → E)
+    (hHb : ∃ M, ∀ x, ‖H x‖ ≤ M) (hHs : ∃ R, ∀ x, R < ‖x‖ → H x = 0)
+    (S : Finset (Fin d × ℝ)) (hHc : ∀ x, (∀ p ∈ S, x p.1 ≠ p.2) → ContinuousAt H x) :
+    Tendsto (fun N : ℕ => ((N : ℝ)⁻¹) ^ d • ∑' k : Fin d → ℤ, H (fun i => (k i : ℝ) / N))
+      atTop (𝓝 (∫ x, H x)) := by
+  classical
+  obtain ⟨M, hM⟩ := hHb
+  obtain ⟨R0, hR0⟩ := hHs
+  set R := max R0 0
+  have hR : ∀ x, R < ‖x‖ → H x = 0 := fun x hx => hR0 x (lt_of_le_of_lt (le_max_left _ _) hx)
+  -- the good set, off the hyperplanes
+  set O : Set (Fin d → ℝ) := {x | ∀ p ∈ S, x p.1 ≠ p.2}
+  have hO : ∀ᵐ x, x ∈ O := by
+    have : (Oᶜ) ⊆ ⋃ p ∈ S, {x : Fin d → ℝ | x p.1 = p.2} := by
+      intro x hx
+      simp only [O, Set.mem_compl_iff, Set.mem_ofPred_eq, not_forall, not_not] at hx
+      obtain ⟨p, hp, hxp⟩ := hx
+      exact Set.mem_biUnion hp hxp
+    rw [ae_iff]
+    refine measure_mono_null (fun x hx => this hx) ?_
+    exact (measure_biUnion_null_iff (Finset.countable_toSet S)).2
+      fun p _ => volume_coord_hyperplane p.1 p.2
+  -- finite range of lattice points
+  set F : ℕ → Finset (Fin d → ℤ) := fun N =>
+    Fintype.piFinset fun _ => Finset.Icc (-(⌈R * N⌉ + 1)) (⌈R * N⌉ + 1)
+  have hF : ∀ N : ℕ, 0 < N → ∀ k : Fin d → ℤ, k ∉ F N → H (fun i => (k i : ℝ) / N) = 0 := by
+    intro N hN k hk
+    have hN' : (0 : ℝ) < N := by exact_mod_cast hN
+    simp only [F, Fintype.mem_piFinset, Finset.mem_Icc, not_forall] at hk
+    obtain ⟨i, hi⟩ := hk
+    apply hR
+    have hki : R * N < |(k i : ℝ)| := by
+      have h1 := Int.le_ceil (R * N)
+      rcases not_and_or.1 hi with h | h
+      · push Not at h
+        have : (k i : ℝ) < -(⌈R * N⌉ + 1) := by exact_mod_cast h
+        rw [abs_of_neg (by linarith [mul_nonneg (le_max_right R0 0) hN'.le])]
+        linarith
+      · push Not at h
+        have : (⌈R * N⌉ + 1 : ℝ) < (k i : ℝ) := by exact_mod_cast h
+        rw [abs_of_pos (by linarith [mul_nonneg (le_max_right R0 0) hN'.le])]
+        linarith
+    calc R < |(k i : ℝ) / N| := by
+          rw [abs_div, Nat.abs_cast, lt_div_iff₀ hN']; exact hki
+      _ = ‖(fun i => (k i : ℝ) / N) i‖ := by rw [Real.norm_eq_abs]
+      _ ≤ ‖fun i => (k i : ℝ) / N‖ := norm_le_pi_norm (fun i => (k i : ℝ) / N) i
+  -- pointwise identity: the sampled function is a finite sum of cube indicators
+  have hrep : ∀ N : ℕ, 0 < N → ∀ x, H (latticeFloor N x) =
+      ∑ k ∈ F N, (latticeCube N k).indicator (fun _ => H (fun i => (k i : ℝ) / N)) x := by
+    intro N hN x
+    set k0 : Fin d → ℤ := fun i => ⌊(N : ℝ) * x i⌋
+    have hmem : ∀ k, x ∈ latticeCube N k ↔ k = k0 := by
+      intro k
+      rw [mem_latticeCube hN]
+      constructor
+      · intro h; funext i; exact (h i).symm
+      · rintro rfl i; rfl
+    have hk0 : latticeFloor N x = fun i => (k0 i : ℝ) / N := rfl
+    by_cases hk : k0 ∈ F N
+    · rw [Finset.sum_eq_single k0]
+      · rw [Set.indicator_of_mem ((hmem k0).2 rfl), hk0]
+      · intro k _ hkk
+        exact Set.indicator_of_notMem (fun h => hkk ((hmem k).1 h)) _
+      · intro h; exact absurd hk h
+    · rw [hk0, hF N hN k0 hk]
+      refine (Finset.sum_eq_zero fun k hkF => ?_).symm
+      exact Set.indicator_of_notMem (fun h => hk ((hmem k).1 h ▸ hkF)) _
+  have hcube_meas : ∀ N k, MeasurableSet (latticeCube (d := d) N k) := fun N k =>
+    MeasurableSet.univ_pi fun _ => measurableSet_Ico
+  -- the Riemann sums are integrals of the sampled function
+  have hsum : ∀ N : ℕ, 0 < N → ((N : ℝ)⁻¹) ^ d • ∑' k : Fin d → ℤ, H (fun i => (k i : ℝ) / N) =
+      ∫ x, H (latticeFloor N x) := by
+    intro N hN
+    have hN' : (0 : ℝ) < N := by exact_mod_cast hN
+    rw [tsum_eq_sum (s := F N) (fun k hk => hF N hN k hk)]
+    simp_rw [hrep N hN]
+    rw [integral_finsetSum]
+    · rw [Finset.smul_sum]
+      refine Finset.sum_congr rfl fun k _ => ?_
+      rw [integral_indicator_const _ (hcube_meas N k), measureReal_def, volume_latticeCube hN,
+        ENNReal.toReal_pow, ENNReal.toReal_ofReal (by positivity)]
+    · intro k _
+      refine IntegrableOn.integrable_indicator (integrableOn_const ?_) (hcube_meas N k)
+      rw [volume_latticeCube hN]; exact ENNReal.pow_ne_top ENNReal.ofReal_ne_top
+  -- dominated convergence
+  have hlim : Tendsto (fun N : ℕ => ∫ x, H (latticeFloor N x)) atTop (𝓝 (∫ x, H x)) := by
+    refine tendsto_integral_filter_of_dominated_convergence
+      ((Metric.closedBall (0 : Fin d → ℝ) (R + 1)).indicator fun _ => M) ?_ ?_ ?_ ?_
+    · filter_upwards [eventually_gt_atTop 0] with N hN
+      rw [show (fun x => H (latticeFloor N x)) = fun x => ∑ k ∈ F N,
+        (latticeCube N k).indicator (fun _ => H (fun i => (k i : ℝ) / N)) x from
+        funext (hrep N hN)]
+      exact Finset.aestronglyMeasurable_fun_sum _ fun k _ =>
+        aestronglyMeasurable_const.indicator (hcube_meas N k)
+    · filter_upwards [eventually_gt_atTop 0] with N hN
+      refine Filter.Eventually.of_forall fun x => ?_
+      by_cases hx : x ∈ Metric.closedBall (0 : Fin d → ℝ) (R + 1)
+      · rw [Set.indicator_of_mem hx]; exact hM _
+      · rw [Set.indicator_of_notMem hx, hR, norm_zero]
+        rw [Metric.mem_closedBall, dist_zero_right, not_le] at hx
+        have hd : ‖x - latticeFloor N x‖ ≤ 1 := by
+          refine (pi_norm_le_iff_of_nonneg zero_le_one).2 fun i => ?_
+          rw [Pi.sub_apply, Real.norm_eq_abs]
+          refine (abs_sub_latticeFloor_le hN x i).trans ?_
+          exact inv_le_one_of_one_le₀ (by exact_mod_cast hN)
+        have := norm_sub_norm_le x (latticeFloor N x)
+        linarith
+    · exact IntegrableOn.integrable_indicator (integrableOn_const measure_closedBall_lt_top.ne)
+        Metric.isClosed_closedBall.measurableSet
+    · filter_upwards [hO] with x hx
+      exact (hHc x hx).tendsto.comp (tendsto_latticeFloor x)
+  refine hlim.congr' ?_
+  filter_upwards [eventually_gt_atTop 0] with N hN
+  exact (hsum N hN).symm
+
+end A04
+
+/-! ### Node A05: nonnegative norming tests -/
+
+section A05
+
+/-- Helper for node A05: the real `L^p` norm `‖f‖_p = (eLpNorm f p).toReal` satisfies
+`‖a‖_p ≤ ‖b‖_p + ‖a - b‖_p` for `p ≥ 1`. -/
+lemma toReal_eLpNorm_le_add {α : Type*} [MeasurableSpace α] {μ : Measure α} {p : ℝ≥0∞}
+    (hp : 1 ≤ p) {a b : α → ℝ} (ha : MemLp a p μ) (hb : MemLp b p μ) :
+    (eLpNorm a p μ).toReal ≤ (eLpNorm b p μ).toReal + (eLpNorm (a - b) p μ).toReal := by
+  have h := eLpNorm_add_le (f := b) (g := a - b) (μ := μ) hp
+  rw [show b + (a - b) = a by abel] at h
+  rw [← ENNReal.toReal_add hb.eLpNorm_ne_top (ha.sub hb).eLpNorm_ne_top]
+  exact ENNReal.toReal_mono (ENNReal.add_ne_top.2 ⟨hb.eLpNorm_ne_top, (ha.sub hb).eLpNorm_ne_top⟩) h
+
+/-- Helper for node A05: for `f ∈ L^p`, `1 ≤ p < ∞`, the real `L^p` norm is
+`(∫ |f|^p)^{1/p}`. -/
+lemma toReal_eLpNorm_eq_integral {α : Type*} [MeasurableSpace α] {μ : Measure α} {p : ℝ}
+    (hp : 0 < p) {f : α → ℝ} (hf : MemLp f (ENNReal.ofReal p) μ) :
+    (eLpNorm f (ENNReal.ofReal p) μ).toReal = (∫ x, |f x| ^ p ∂μ) ^ (1 / p) := by
+  rw [hf.eLpNorm_eq_integral_rpow_norm (by simpa using hp) ENNReal.ofReal_ne_top,
+    ENNReal.toReal_ofReal (by positivity), ENNReal.toReal_ofReal hp.le, one_div]
+  simp_rw [Real.norm_eq_abs]
+
+/-- **Lemma 2.5 (node A05), nonnegative norming test.** Let `U ≥ 0` be in `L^{3/2}(ℝ²)`. If
+`∫ H U ≤ B ‖H‖_3` for every nonnegative continuous compactly supported `H`, then
+`‖U‖_{3/2} ≤ B`. Norms are written as `‖H‖_3 = (∫ |H|^3)^{1/3}` and
+`‖U‖_{3/2} = (∫ U^{3/2})^{2/3}`. -/
+theorem nonnegative_Lp_norm_test {U : ℝ × ℝ → ℝ} (hU0 : 0 ≤ U)
+    (hU : MemLp U (ENNReal.ofReal (3 / 2))) {B : ℝ}
+    (hB : ∀ H : ℝ × ℝ → ℝ, Continuous H → HasCompactSupport H → 0 ≤ H →
+      ∫ x, H x * U x ≤ B * (∫ x, |H x| ^ (3 : ℝ)) ^ (1 / 3 : ℝ)) :
+    (∫ x, U x ^ (3 / 2 : ℝ)) ^ (2 / 3 : ℝ) ≤ B := by
+  set I := ∫ x, U x ^ (3 / 2 : ℝ) with hI
+  have hI0 : 0 ≤ I := integral_nonneg fun x => Real.rpow_nonneg (hU0 x) _
+  set p3 : ℝ≥0∞ := ENNReal.ofReal 3
+  -- `B ≥ 0`, tested on a bump
+  have hB0 : 0 ≤ B := by
+    let H : ℝ × ℝ → ℝ := fun x => max (1 - ‖x‖) 0
+    have hHc : Continuous H := by fun_prop
+    have hHs : HasCompactSupport H := by
+      refine HasCompactSupport.intro (isCompact_closedBall (0 : ℝ × ℝ) 1) fun x hx => ?_
+      rw [Metric.mem_closedBall, dist_zero_right, not_le] at hx
+      simp only [H]; exact max_eq_right (by linarith)
+    have hH0 : 0 ≤ H := fun x => le_max_right _ _
+    have hpos : 0 < ∫ x, |H x| ^ (3 : ℝ) := by
+      refine (Continuous.integral_pos_of_hasCompactSupport_nonneg_nonzero (x := 0) ?_ ?_ ?_ ?_)
+      · exact (continuous_abs.comp hHc).rpow_const fun _ => Or.inr (by norm_num)
+      · exact hHs.comp_left (g := fun y : ℝ => |y| ^ (3 : ℝ)) (by simp)
+      · exact fun x => Real.rpow_nonneg (abs_nonneg _) _
+      · simp [H]
+    have h1 := hB H hHc hHs hH0
+    have h2 : 0 ≤ ∫ x, H x * U x := integral_nonneg fun x => mul_nonneg (hH0 x) (hU0 x)
+    have h3 : 0 < (∫ x, |H x| ^ (3 : ℝ)) ^ (1 / 3 : ℝ) := Real.rpow_pos_of_pos hpos _
+    by_contra hneg
+    push Not at hneg
+    nlinarith
+  -- the test function `H₀ = U^{1/2} ∈ L³`
+  set H0 : ℝ × ℝ → ℝ := fun x => U x ^ (1 / 2 : ℝ) with hH0def
+  have hH0nn : 0 ≤ H0 := fun x => Real.rpow_nonneg (hU0 x) _
+  have hH0 : MemLp H0 p3 := by
+    have := hU.norm_rpow_div (ENNReal.ofReal (1 / 2))
+    rw [ENNReal.toReal_ofReal (by norm_num), ← ENNReal.ofReal_div_of_pos (by norm_num),
+      show (3 / 2 : ℝ) / (1 / 2) = 3 by norm_num] at this
+    refine this.congr_norm ?_ ?_
+    · exact (hU.aestronglyMeasurable.aemeasurable.pow_const (1 / 2 : ℝ)).aestronglyMeasurable
+    · exact Filter.Eventually.of_forall fun x => by
+        simp [Real.norm_eq_abs, abs_of_nonneg (hU0 x), H0,
+          abs_of_nonneg (Real.rpow_nonneg (hU0 x) _)]
+  have hΦH0 : (eLpNorm H0 p3).toReal = I ^ (1 / 3 : ℝ) := by
+    rw [toReal_eLpNorm_eq_integral (by norm_num) hH0]
+    congr 2
+    funext x
+    rw [abs_of_nonneg (hH0nn x), ← Real.rpow_mul (hU0 x)]
+    norm_num
+  -- approximation by continuous compactly supported functions
+  have happ : ∀ n : ℕ, ∃ g : ℝ × ℝ → ℝ, HasCompactSupport g ∧
+      eLpNorm (H0 - g) p3 ≤ ENNReal.ofReal (1 / (n + 1)) ∧ Continuous g ∧ MemLp g p3 :=
+    fun n => hH0.exists_hasCompactSupport_eLpNorm_sub_le ENNReal.ofReal_ne_top
+      (by simp; positivity)
+  choose g hgs hgε hgc hgL using happ
+  set Hn : ℕ → ℝ × ℝ → ℝ := fun n x => |g n x|
+  have hHnL : ∀ n, MemLp (Hn n) p3 := fun n => (hgL n).abs
+  have hdiff : ∀ n, (eLpNorm (Hn n - H0) p3).toReal ≤ 1 / (n + 1) := by
+    intro n
+    have h1 : eLpNorm (Hn n - H0) p3 ≤ eLpNorm (H0 - g n) p3 := by
+      refine eLpNorm_mono ((hHnL n).sub hH0).aestronglyMeasurable fun x => ?_
+      simp only [Pi.sub_apply, Real.norm_eq_abs, Hn]
+      rw [abs_sub_comm]
+      calc |H0 x - (|g n x|)| = |(|H0 x|) - (|g n x|)| := by rw [abs_of_nonneg (hH0nn x)]
+        _ ≤ |H0 x - g n x| := abs_abs_sub_abs_le_abs_sub _ _
+    refine (ENNReal.toReal_mono ENNReal.ofReal_ne_top (h1.trans (hgε n))).trans ?_
+    rw [ENNReal.toReal_ofReal (by positivity)]
+  have hdiff0 : Tendsto (fun n : ℕ => (eLpNorm (Hn n - H0) p3).toReal) atTop (𝓝 0) := by
+    refine squeeze_zero (fun n => ENNReal.toReal_nonneg) hdiff ?_
+    exact tendsto_one_div_add_atTop_nhds_zero_nat
+  -- convergence of the norms
+  have hnorm : Tendsto (fun n => (eLpNorm (Hn n) p3).toReal) atTop (𝓝 (I ^ (1 / 3 : ℝ))) := by
+    rw [← hΦH0]
+    rw [tendsto_iff_dist_tendsto_zero]
+    refine squeeze_zero (fun n => dist_nonneg) (fun n => ?_) hdiff0
+    rw [Real.dist_eq, abs_le]
+    have hp3 : (1 : ℝ≥0∞) ≤ p3 := ENNReal.one_le_ofReal.2 (by norm_num)
+    have e1 := toReal_eLpNorm_le_add hp3 (hHnL n) hH0
+    have e2 := toReal_eLpNorm_le_add hp3 hH0 (hHnL n)
+    have e3 : (eLpNorm (H0 - Hn n) p3).toReal = (eLpNorm (Hn n - H0) p3).toReal := by
+      rw [← eLpNorm_neg]; congr 2; abel
+    constructor <;> linarith
+  -- convergence of the pairings, by Hölder
+  have hholder : ∀ f : ℝ × ℝ → ℝ, MemLp f p3 → 0 ≤ f →
+      ∫ x, f x * U x ≤ (eLpNorm f p3).toReal * I ^ (2 / 3 : ℝ) := by
+    intro f hf hf0
+    have hconj : (3 : ℝ).HolderConjugate (3 / 2) := by
+      rw [Real.holderConjugate_iff]; norm_num
+    have := integral_mul_le_Lp_mul_Lq_of_nonneg hconj (Filter.Eventually.of_forall hf0)
+      (Filter.Eventually.of_forall hU0) hf hU
+    rw [toReal_eLpNorm_eq_integral (by norm_num) hf]
+    convert this using 3
+    · congr 1; funext x; rw [abs_of_nonneg (hf0 x)]
+    · norm_num
+  have hpair : Tendsto (fun n => ∫ x, Hn n x * U x) atTop (𝓝 I) := by
+    have hUI : ∫ x, H0 x * U x = I := by
+      rw [hI]; congr 1; funext x
+      rw [show U x = U x ^ (1 : ℝ) by simp, ← Real.rpow_add' (hU0 x) (by norm_num)]
+      norm_num
+    rw [← hUI, tendsto_iff_dist_tendsto_zero]
+    have hb : Tendsto (fun n => (eLpNorm (Hn n - H0) p3).toReal * I ^ (2 / 3 : ℝ)) atTop
+        (𝓝 0) := by simpa using hdiff0.mul_const (I ^ (2 / 3 : ℝ))
+    refine squeeze_zero (fun n => dist_nonneg) (fun n => ?_) hb
+    have hint : ∀ f : ℝ × ℝ → ℝ, MemLp f p3 → Integrable (fun x => f x * U x) := by
+      intro f hf
+      have : ENNReal.HolderConjugate p3 (ENNReal.ofReal (3 / 2)) := by
+        rw [ENNReal.holderConjugate_iff, ← ENNReal.ofReal_inv_of_pos (by norm_num),
+          ← ENNReal.ofReal_inv_of_pos (by norm_num), ← ENNReal.ofReal_add (by norm_num)
+          (by norm_num)]
+        norm_num
+      exact hf.integrable_mul hU
+    rw [Real.dist_eq, ← integral_sub (hint _ (hHnL n)) (hint _ hH0)]
+    refine (abs_integral_le_integral_abs).trans ?_
+    have : ∀ x, |Hn n x * U x - H0 x * U x| = |(Hn n - H0) x| * U x := by
+      intro x; rw [← sub_mul, abs_mul, abs_of_nonneg (hU0 x)]; rfl
+    simp_rw [this]
+    have h := hholder (fun x => |(Hn n - H0) x|) ((hHnL n).sub hH0).abs fun x => abs_nonneg _
+    refine h.trans (le_of_eq ?_)
+    congr 2
+    exact eLpNorm_congr_norm_ae ((hHnL n).sub hH0).aestronglyMeasurable.norm
+      ((hHnL n).sub hH0).aestronglyMeasurable (Filter.Eventually.of_forall fun x => by simp)
+  -- pass to the limit in the hypothesis
+  have hlim : I ≤ B * I ^ (1 / 3 : ℝ) := by
+    refine le_of_tendsto_of_tendsto' hpair (hnorm.const_mul B) fun n => ?_
+    have := hB (Hn n) (hgc n).abs ((hgs n).comp_left abs_zero) fun x => abs_nonneg _
+    rw [← toReal_eLpNorm_eq_integral (by norm_num) (hHnL n)] at this
+    exact this
+  rcases hI0.eq_or_lt with h0 | hpos
+  · rw [← h0, Real.zero_rpow (by norm_num)]; exact hB0
+  · have h13 : 0 < I ^ (1 / 3 : ℝ) := Real.rpow_pos_of_pos hpos _
+    have : I ^ (2 / 3 : ℝ) * I ^ (1 / 3 : ℝ) = I := by
+      rw [← Real.rpow_add hpos]; norm_num
+    nlinarith
+
+end A05
+
+/-! ### Node A06: an integrable-kernel bilinear bound -/
+
+section A06
+
+lemma ofReal_three_halves : ENNReal.ofReal (3 / 2) = 3 / 2 := by
+  rw [ENNReal.ofReal_div_of_pos (by norm_num)]; simp
+
+lemma toReal_three_halves : (3 / 2 : ℝ≥0∞).toReal = 3 / 2 := by
+  rw [ENNReal.toReal_div]; simp
+
+/-- Helper for node A06 (Hölder for the probability measure `|K| dt / ‖K‖₁`):
+`(∫ f k)^{3/2} ≤ (∫ k)^{1/2} ∫ f^{3/2} k` for nonnegative measurable `f, k`. -/
+lemma lintegral_mul_rpow_three_halves_le {α : Type*} [MeasurableSpace α] {μ : Measure α}
+    {f k : α → ℝ≥0∞} (hf : AEMeasurable f μ) (hk : AEMeasurable k μ) :
+    (∫⁻ a, f a * k a ∂μ) ^ (3 / 2 : ℝ) ≤
+      (∫⁻ a, k a ∂μ) ^ (1 / 2 : ℝ) * ∫⁻ a, f a ^ (3 / 2 : ℝ) * k a ∂μ := by
+  have hsplit : ∀ a, f a * k a = (f a * k a ^ (2 / 3 : ℝ)) * k a ^ (1 / 3 : ℝ) := by
+    intro a
+    rw [mul_assoc, ← ENNReal.rpow_add_of_nonneg _ _ (by norm_num) (by norm_num)]
+    norm_num
+  have hconj : (3 / 2 : ℝ).HolderConjugate 3 := by
+    rw [Real.holderConjugate_iff]; norm_num
+  have hH := ENNReal.lintegral_mul_le_Lp_mul_Lq μ hconj
+    (f := fun a => f a * k a ^ (2 / 3 : ℝ)) (g := fun a => k a ^ (1 / 3 : ℝ))
+    (hf.mul (hk.pow_const _)) (hk.pow_const _)
+  have e1 : ∀ a, (f a * k a ^ (2 / 3 : ℝ)) ^ (3 / 2 : ℝ) = f a ^ (3 / 2 : ℝ) * k a := by
+    intro a
+    rw [ENNReal.mul_rpow_of_nonneg _ _ (by norm_num), ← ENNReal.rpow_mul]
+    norm_num
+  have e2 : ∀ a, (k a ^ (1 / 3 : ℝ)) ^ (3 : ℝ) = k a := by
+    intro a; rw [← ENNReal.rpow_mul]; norm_num
+  simp only [Pi.mul_apply, e1, e2, ← hsplit] at hH
+  calc (∫⁻ a, f a * k a ∂μ) ^ (3 / 2 : ℝ)
+      ≤ ((∫⁻ a, f a ^ (3 / 2 : ℝ) * k a ∂μ) ^ (1 / (3 / 2) : ℝ) *
+          (∫⁻ a, k a ∂μ) ^ (1 / 3 : ℝ)) ^ (3 / 2 : ℝ) :=
+        ENNReal.rpow_le_rpow hH (by norm_num)
+    _ = (∫⁻ a, k a ∂μ) ^ (1 / 2 : ℝ) * ∫⁻ a, f a ^ (3 / 2 : ℝ) * k a ∂μ := by
+        rw [ENNReal.mul_rpow_of_nonneg _ _ (by norm_num), ← ENNReal.rpow_mul,
+          ← ENNReal.rpow_mul, mul_comm]
+        norm_num
+
+/-- The bilinear operator of Lemma 2.6 (node A06):
+`B_K(F,G)(x,y) = ∫ F(x+t, y) G(x, y+t) K(t) dt`. -/
+def bilinKernel (K : ℝ → ℂ) (F G : ℝ × ℝ → ℂ) (p : ℝ × ℝ) : ℂ :=
+  ∫ t, F (p.1 + t, p.2) * G (p.1, p.2 + t) * K t
+
+section bounds
+
+variable {K : ℝ → ℂ} {F G : ℝ × ℝ → ℂ}
+
+/-- Helper for node A06: the `L^{3/2}` energy of the majorant
+`A(p) = ∫ |F(p + (t,0))| |G(p + (0,t))| |K(t)| dt`. -/
+lemma lintegral_bilinMajorant_rpow_le (hF : Measurable F) (hG : Measurable G)
+    (hK : Measurable K) :
+    ∫⁻ p : ℝ × ℝ, (∫⁻ t, ‖F (p.1 + t, p.2) * G (p.1, p.2 + t) * K t‖ₑ) ^ (3 / 2 : ℝ) ≤
+      (∫⁻ t, ‖K t‖ₑ) ^ (3 / 2 : ℝ) * (∫⁻ p, ‖F p‖ₑ ^ (3 : ℝ)) ^ (1 / 2 : ℝ) *
+        (∫⁻ p, ‖G p‖ₑ ^ (3 : ℝ)) ^ (1 / 2 : ℝ) := by
+  set φ : ℝ × ℝ → ℝ → ℝ≥0∞ := fun p t => ‖F (p.1 + t, p.2)‖ₑ * ‖G (p.1, p.2 + t)‖ₑ
+  set k : ℝ → ℝ≥0∞ := fun t => ‖K t‖ₑ
+  have hφ : Measurable (Function.uncurry φ) :=
+    ((hF.comp (f := fun q : (ℝ × ℝ) × ℝ => (q.1.1 + q.2, q.1.2)) (by fun_prop)).enorm).mul
+      ((hG.comp (f := fun q : (ℝ × ℝ) × ℝ => (q.1.1, q.1.2 + q.2)) (by fun_prop)).enorm)
+  have hk : Measurable k := hK.enorm
+  have hint : ∀ p t, ‖F (p.1 + t, p.2) * G (p.1, p.2 + t) * K t‖ₑ = φ p t * k t := by
+    intro p t; simp [φ, k, enorm_mul]
+  simp_rw [hint]
+  set CF := (∫⁻ p, ‖F p‖ₑ ^ (3 : ℝ)) ^ (1 / 2 : ℝ)
+  set CG := (∫⁻ p, ‖G p‖ₑ ^ (3 : ℝ)) ^ (1 / 2 : ℝ)
+  -- Cauchy–Schwarz and translation invariance for each fixed `t`
+  have hCS : ∀ t, ∫⁻ p, φ p t ^ (3 / 2 : ℝ) ≤ CF * CG := by
+    intro t
+    have hconj : (2 : ℝ).HolderConjugate 2 := Real.HolderConjugate.two_two
+    have := ENNReal.lintegral_mul_le_Lp_mul_Lq (volume : Measure (ℝ × ℝ)) hconj
+      (f := fun p => ‖F (p.1 + t, p.2)‖ₑ ^ (3 / 2 : ℝ))
+      (g := fun p => ‖G (p.1, p.2 + t)‖ₑ ^ (3 / 2 : ℝ))
+      ((hF.comp (by fun_prop)).enorm.pow_const _).aemeasurable
+      ((hG.comp (by fun_prop)).enorm.pow_const _).aemeasurable
+    have e : ∀ (z : ℝ≥0∞), (z ^ (3 / 2 : ℝ)) ^ (2 : ℝ) = z ^ (3 : ℝ) := by
+      intro z; rw [← ENNReal.rpow_mul]; norm_num
+    simp only [Pi.mul_apply, e] at this
+    have tF : ∫⁻ p : ℝ × ℝ, ‖F (p.1 + t, p.2)‖ₑ ^ (3 : ℝ) = ∫⁻ p, ‖F p‖ₑ ^ (3 : ℝ) := by
+      have := lintegral_add_right_eq_self (μ := (volume : Measure (ℝ × ℝ)))
+        (fun p => ‖F p‖ₑ ^ (3 : ℝ)) ((t, 0) : ℝ × ℝ)
+      rw [← this]; congr 1; funext p; congr 3; ext <;> simp
+    have tG : ∫⁻ p : ℝ × ℝ, ‖G (p.1, p.2 + t)‖ₑ ^ (3 : ℝ) = ∫⁻ p, ‖G p‖ₑ ^ (3 : ℝ) := by
+      have := lintegral_add_right_eq_self (μ := (volume : Measure (ℝ × ℝ)))
+        (fun p => ‖G p‖ₑ ^ (3 : ℝ)) ((0, t) : ℝ × ℝ)
+      rw [← this]; congr 1; funext p; congr 3; ext <;> simp
+    rw [tF, tG] at this
+    refine le_trans (le_of_eq ?_) (this.trans (le_of_eq ?_))
+    · congr 1; funext p
+      simp only [φ]
+      rw [ENNReal.mul_rpow_of_nonneg _ _ (by norm_num)]
+    · simp only [CF, CG]
+  calc ∫⁻ p, (∫⁻ t, φ p t * k t) ^ (3 / 2 : ℝ)
+      ≤ ∫⁻ p, (∫⁻ t, k t) ^ (1 / 2 : ℝ) * ∫⁻ t, φ p t ^ (3 / 2 : ℝ) * k t := by
+        refine lintegral_mono fun p => ?_
+        exact lintegral_mul_rpow_three_halves_le
+          (hφ.comp (measurable_const.prodMk measurable_id)).aemeasurable hk.aemeasurable
+    _ = (∫⁻ t, k t) ^ (1 / 2 : ℝ) * ∫⁻ p, ∫⁻ t, φ p t ^ (3 / 2 : ℝ) * k t := by
+        rw [lintegral_const_mul]
+        exact ((hφ.pow_const _).mul (hk.comp measurable_snd)).lintegral_prod_right'
+    _ = (∫⁻ t, k t) ^ (1 / 2 : ℝ) * ∫⁻ t, ∫⁻ p, φ p t ^ (3 / 2 : ℝ) * k t := by
+        rw [lintegral_lintegral_swap]
+        exact ((hφ.pow_const _).mul (hk.comp measurable_snd)).aemeasurable
+    _ = (∫⁻ t, k t) ^ (1 / 2 : ℝ) * ∫⁻ t, (∫⁻ p, φ p t ^ (3 / 2 : ℝ)) * k t := by
+        congr 1
+        refine lintegral_congr fun t => ?_
+        rw [lintegral_mul_const]
+        exact (hφ.comp (measurable_id.prodMk measurable_const)).pow_const _
+    _ ≤ (∫⁻ t, k t) ^ (1 / 2 : ℝ) * ∫⁻ t, CF * CG * k t := by
+        gcongr with t
+        exact hCS t
+    _ = (∫⁻ t, k t) ^ (3 / 2 : ℝ) * CF * CG := by
+        rw [lintegral_const_mul _ hk]
+        rw [show (3 / 2 : ℝ) = 1 / 2 + 1 by norm_num,
+          ENNReal.rpow_add_of_nonneg _ _ (by norm_num) (by norm_num), ENNReal.rpow_one]
+        ring
+
+/-- **Lemma 2.6 (node A06), integrable-kernel bilinear bound.** For measurable
+`F, G ∈ L³(ℝ²)` and measurable `K ∈ L¹(ℝ)`:
+the integral defining `B_K(F,G)(x,y)` converges absolutely for a.e. `(x,y)`,
+`B_K(F,G) ∈ L^{3/2}(ℝ²)`, and `‖B_K(F,G)‖_{3/2} ≤ ‖K‖₁ ‖F‖₃ ‖G‖₃`. -/
+theorem L1_kernel_bilinear_bound (hF : Measurable F) (hG : Measurable G) (hK : Measurable K)
+    (hF3 : MemLp F 3) (hG3 : MemLp G 3) (hK1 : Integrable K) :
+    (∀ᵐ p : ℝ × ℝ, Integrable fun t => F (p.1 + t, p.2) * G (p.1, p.2 + t) * K t) ∧
+    MemLp (bilinKernel K F G) (3 / 2) ∧
+    eLpNorm (bilinKernel K F G) (3 / 2) ≤ eLpNorm K 1 * eLpNorm F 3 * eLpNorm G 3 := by
+  set A : ℝ × ℝ → ℝ≥0∞ := fun p => ∫⁻ t, ‖F (p.1 + t, p.2) * G (p.1, p.2 + t) * K t‖ₑ
+  have hjoint : Measurable fun q : (ℝ × ℝ) × ℝ =>
+      F (q.1.1 + q.2, q.1.2) * G (q.1.1, q.1.2 + q.2) * K q.2 := by
+    refine (Measurable.mul ?_ ?_).mul (hK.comp measurable_snd)
+    · exact hF.comp (by fun_prop)
+    · exact hG.comp (by fun_prop)
+  have hAm : Measurable A := hjoint.enorm.lintegral_prod_right'
+  have key := lintegral_bilinMajorant_rpow_le hF hG hK
+  -- norms in lintegral form
+  have hF3' : eLpNorm F 3 = (∫⁻ p, ‖F p‖ₑ ^ (3 : ℝ)) ^ (1 / 3 : ℝ) := by
+    rw [eLpNorm_eq_lintegral_rpow_enorm_toReal (by norm_num) (by norm_num)
+      hF3.aestronglyMeasurable]; simp
+  have hG3' : eLpNorm G 3 = (∫⁻ p, ‖G p‖ₑ ^ (3 : ℝ)) ^ (1 / 3 : ℝ) := by
+    rw [eLpNorm_eq_lintegral_rpow_enorm_toReal (by norm_num) (by norm_num)
+      hG3.aestronglyMeasurable]; simp
+  have hK1' : eLpNorm K 1 = ∫⁻ t, ‖K t‖ₑ :=
+    eLpNorm_one_eq_lintegral_enorm hK1.aestronglyMeasurable
+  have hfinF : ∫⁻ p, ‖F p‖ₑ ^ (3 : ℝ) ≠ ⊤ := by
+    have := hF3.eLpNorm_lt_top
+    rw [hF3'] at this
+    exact (ENNReal.rpow_lt_top_iff_of_pos (by norm_num)).1 this |>.ne
+  have hfinG : ∫⁻ p, ‖G p‖ₑ ^ (3 : ℝ) ≠ ⊤ := by
+    have := hG3.eLpNorm_lt_top
+    rw [hG3'] at this
+    exact (ENNReal.rpow_lt_top_iff_of_pos (by norm_num)).1 this |>.ne
+  have hfinK : ∫⁻ t, ‖K t‖ₑ ≠ ⊤ := hK1.2.ne
+  have hAfin : ∫⁻ p, A p ^ (3 / 2 : ℝ) ≠ ⊤ := by
+    refine ne_top_of_le_ne_top ?_ key
+    exact ENNReal.mul_ne_top (ENNReal.mul_ne_top (ENNReal.rpow_ne_top_of_nonneg (by norm_num)
+      hfinK) (ENNReal.rpow_ne_top_of_nonneg (by norm_num) hfinF))
+      (ENNReal.rpow_ne_top_of_nonneg (by norm_num) hfinG)
+  -- a.e. absolute convergence
+  have hAe : ∀ᵐ p ∂(volume : Measure (ℝ × ℝ)), A p < ⊤ := by
+    have := ae_lt_top (hAm.pow_const (3 / 2 : ℝ)) hAfin
+    filter_upwards [this] with p hp
+    exact (ENNReal.rpow_lt_top_iff_of_pos (by norm_num)).1 hp
+  have hBm : AEStronglyMeasurable (bilinKernel K F G) := by
+    have := hjoint.stronglyMeasurable.integral_prod_right'
+      (f := fun q : (ℝ × ℝ) × ℝ => F (q.1.1 + q.2, q.1.2) * G (q.1.1, q.1.2 + q.2) * K q.2)
+      (ν := volume)
+    exact this.aestronglyMeasurable
+  have hBle : ∀ p, ‖bilinKernel K F G p‖ₑ ≤ A p := fun p => enorm_integral_le_lintegral_enorm _
+  -- the norm bound
+  have hbound : eLpNorm (bilinKernel K F G) (3 / 2) ≤ eLpNorm K 1 * eLpNorm F 3 * eLpNorm G 3 := by
+    rw [eLpNorm_eq_lintegral_rpow_enorm_toReal (by norm_num)
+      (ENNReal.div_ne_top (by simp) (by simp)) hBm, toReal_three_halves, hF3', hG3', hK1']
+    calc (∫⁻ p, ‖bilinKernel K F G p‖ₑ ^ (3 / 2 : ℝ)) ^ (1 / (3 / 2) : ℝ)
+        ≤ (∫⁻ p, A p ^ (3 / 2 : ℝ)) ^ (1 / (3 / 2) : ℝ) := by
+          gcongr with p
+          exact hBle p
+      _ ≤ ((∫⁻ t, ‖K t‖ₑ) ^ (3 / 2 : ℝ) * (∫⁻ p, ‖F p‖ₑ ^ (3 : ℝ)) ^ (1 / 2 : ℝ) *
+            (∫⁻ p, ‖G p‖ₑ ^ (3 : ℝ)) ^ (1 / 2 : ℝ)) ^ (1 / (3 / 2) : ℝ) := by
+          gcongr
+      _ = _ := by
+          rw [ENNReal.mul_rpow_of_nonneg _ _ (by norm_num),
+            ENNReal.mul_rpow_of_nonneg _ _ (by norm_num), ← ENNReal.rpow_mul,
+            ← ENNReal.rpow_mul, ← ENNReal.rpow_mul]
+          norm_num
+  refine ⟨?_, lt_of_le_of_lt hbound ?_, hbound⟩
+  · filter_upwards [hAe] with p hp
+    refine ⟨(hjoint.comp (measurable_const.prodMk measurable_id)).aestronglyMeasurable, ?_⟩
+    exact hp
+  · exact ENNReal.mul_lt_top (ENNReal.mul_lt_top (memLp_one_iff_integrable.2 hK1).eLpNorm_lt_top
+      hF3.eLpNorm_lt_top)
+      hG3.eLpNorm_lt_top
+
+/-- **Lemma 2.6 (node A06), continuity in the inputs.** For a fixed integrable kernel the
+output depends continuously on the inputs:
+`‖B_K(F,G) - B_K(F',G')‖_{3/2} ≤ ‖K‖₁ (‖F - F'‖₃ ‖G‖₃ + ‖F'‖₃ ‖G - G'‖₃)`. -/
+theorem L1_kernel_bilinear_continuity {F' G' : ℝ × ℝ → ℂ} (hF : Measurable F)
+    (hG : Measurable G) (hF' : Measurable F') (hG' : Measurable G') (hK : Measurable K)
+    (hF3 : MemLp F 3) (hG3 : MemLp G 3) (hF'3 : MemLp F' 3) (hG'3 : MemLp G' 3)
+    (hK1 : Integrable K) :
+    eLpNorm (bilinKernel K F G - bilinKernel K F' G') (3 / 2) ≤
+      eLpNorm K 1 * (eLpNorm (F - F') 3 * eLpNorm G 3 + eLpNorm F' 3 * eLpNorm (G - G') 3) := by
+  obtain ⟨h1, -, -⟩ := L1_kernel_bilinear_bound hF hG hK hF3 hG3 hK1
+  obtain ⟨h2, -, -⟩ := L1_kernel_bilinear_bound hF' hG hK hF'3 hG3 hK1
+  obtain ⟨h3, -, -⟩ := L1_kernel_bilinear_bound hF' hG' hK hF'3 hG'3 hK1
+  obtain ⟨-, hA, hAb⟩ := L1_kernel_bilinear_bound (hF.sub hF') hG hK (hF3.sub hF'3) hG3 hK1
+  obtain ⟨-, hB, hBb⟩ := L1_kernel_bilinear_bound hF' (hG.sub hG') hK hF'3 (hG3.sub hG'3) hK1
+  have hae : bilinKernel K F G - bilinKernel K F' G' =ᵐ[volume]
+      bilinKernel K (F - F') G + bilinKernel K F' (G - G') := by
+    filter_upwards [h1, h2, h3] with p hp1 hp2 hp3
+    simp only [Pi.sub_apply, Pi.add_apply, bilinKernel]
+    have e1 : ∫ t, (F (p.1 + t, p.2) - F' (p.1 + t, p.2)) * G (p.1, p.2 + t) * K t =
+        (∫ t, F (p.1 + t, p.2) * G (p.1, p.2 + t) * K t) -
+          ∫ t, F' (p.1 + t, p.2) * G (p.1, p.2 + t) * K t := by
+      rw [← integral_sub hp1 hp2]; congr 1; funext t; ring
+    have e2 : ∫ t, F' (p.1 + t, p.2) * (G (p.1, p.2 + t) - G' (p.1, p.2 + t)) * K t =
+        (∫ t, F' (p.1 + t, p.2) * G (p.1, p.2 + t) * K t) -
+          ∫ t, F' (p.1 + t, p.2) * G' (p.1, p.2 + t) * K t := by
+      rw [← integral_sub hp2 hp3]; congr 1; funext t; ring
+    rw [e1, e2]; ring
+  rw [eLpNorm_congr_ae hae]
+  have h32 : (1 : ℝ≥0∞) ≤ 3 / 2 := by
+    rw [← ofReal_three_halves]; exact ENNReal.one_le_ofReal.2 (by norm_num)
+  refine (eLpNorm_add_le h32).trans ?_
+  rw [mul_add]
+  gcongr
+  · exact hAb.trans (le_of_eq (mul_assoc _ _ _))
+  · refine hBb.trans (le_of_eq ?_); ring
+
+end bounds
+
+end A06
+
+/-! ### Node A07: continuous tests determine a compact metric measure -/
+
+section A07
+
+/-- **Lemma 2.7 (node A07).** Let `K` be a compact metric space and `μ, ν` finite Borel
+measures on `K`. If `∫ h dμ = ∫ h dν` for every real continuous `h` on `K`, then `μ = ν`.
+(The proof via the continuous approximations `max(1 - n d(x, F), 0)` of closed sets is
+Mathlib's `ext_of_forall_integral_eq_of_IsFiniteMeasure`.) -/
+theorem compact_Borel_measure_determined_by_continuous_tests {K : Type*} [MetricSpace K]
+    [CompactSpace K] [MeasurableSpace K] [BorelSpace K] {μ ν : Measure K} [IsFiniteMeasure μ]
+    [IsFiniteMeasure ν] (h : ∀ f : C(K, ℝ), ∫ x, f x ∂μ = ∫ x, f x ∂ν) : μ = ν := by
+  refine ext_of_forall_integral_eq_of_IsFiniteMeasure fun f => ?_
+  exact h f.toContinuousMap
+
+end A07
+
+end
+
 end Auto
