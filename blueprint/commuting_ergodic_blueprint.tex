@@ -1,0 +1,1347 @@
+\documentclass[11pt]{article}
+\usepackage[letterpaper,margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern,amsmath,amssymb,amsthm,microtype,needspace,longtable,booktabs}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\pagestyle{fancy}\fancyhf{}
+\fancyhead[L]{\small Commuting averages: formalization blueprint}
+\fancyhead[R]{\small October 8, 2026}\fancyfoot[C]{\thepage}
+\setlength{\headheight}{14pt}\setlength{\emergencystretch}{2em}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{remark}\newtheorem{remark}[theorem]{Remark}
+\newcommand{\R}{\mathbb R}\newcommand{\C}{\mathbb C}
+\newcommand{\Z}{\mathbb Z}\newcommand{\N}{\mathbb N}
+\newcommand{\dd}{\,\mathrm d}\newcommand{\tr}{\operatorname{tr}}
+\newcommand{\supp}{\operatorname{supp}}\newcommand{\op}{\mathrm{op}}
+\newcommand{\HS}{\mathrm{HS}}\newcommand{\Rea}{\operatorname{Re}}
+\newcommand{\one}{\mathbf1}
+\newcommand{\bpnode}[3]{\par\Needspace{5\baselineskip}\noindent\textbf{Node #1.}\quad\textit{Dependencies: #2.}\par\noindent\textit{Proposed declaration:} \texttt{\detokenize{#3}}.\par\smallskip}
+\newcommand{\lib}[2]{\par\medskip\noindent\textbf{#1. #2}\par}
+\hypersetup{pdftitle={Commuting averages: proof audit and self-contained formalization blueprint},pdfauthor={}}
+\title{Commuting averages\\[4pt]\large Proof audit and a self-contained formalization blueprint}
+\author{}\date{October 8, 2026}
+\begin{document}\maketitle
+\begin{abstract}
+This document rechecks and reorganizes the supplied derivation of almost-everywhere convergence of the averages $N^{-1}\sum_{n<N}f(T^nx)g(S^nx)$ for two commuting probability-preserving transformations. No definitive mathematical error was found in the recheck. The document gives proofs of the nonlibrary ingredients and a forward-ordered list of formalization nodes, with the imported mathematical interfaces stated explicitly. It does not assume the triangular Hilbert transform theorem, any variation theorem, an ergodic pointwise convergence theorem, or a natural-extension theorem. A simplification replaces the passage through full $r$-variation by a direct counting-to-Cauchy argument. This is a mathematical blueprint, not a Lean implementation or a kernel-checked certificate.
+\end{abstract}
+\paragraph{Target.}
+On an arbitrary probability space, let $T,S$ be commuting measurable measure-preserving transformations. For bounded measurable complex $f,g$, we prove that
+\[
+ A_N(f,g)(x)=\frac1N\sum_{n=0}^{N-1}f(T^nx)g(S^nx)
+\]
+converges almost everywhere, and in every finite $L^r$. Invertibility and ergodicity are not assumed. We also prove almost-everywhere convergence for $f\in L^p$, $g\in L^q$, $1\le p,q\le\infty$, $1/p+1/q\le1$, and convergence in $L^r$ when $1/r=1/p+1/q>0$.
+
+\paragraph{Audit conclusion and dependencies.}
+The earlier derivation is self-contained relative to standard analysis and finite-dimensional linear algebra, not relative to an imported triangular Hilbert transform result. Its matrix cost, cyclic trace estimate, and repeated-mask argument are adaptations of the method in \cite{repo}; they are proved again below. The scale-dependent displacement average and the fourth-derivative estimate are also proved below. In particular, citing \cite{repo} records the source of the method; removing that citation would not remove a mathematical premise of the proof.
+
+The audit checked the fixed-support qualifications in matrix differentiation and averaging, the complex-phase reduction in the trace estimate, the variance contributed by the displacement Gaussian, the dependence on the dual-array norm in the switch estimate, the output-dependent measurable choices, the scalar recovery of the one-sided kernel, and the exact suspension identity. The additional details below make those checks explicit. The conclusion ``no error found'' is an analytic assessment, not independent validation or a claim that Lean has accepted the argument.
+
+\paragraph{Meaning of forward order.}
+The target above is a specification, not a premise. The imported interfaces are listed first. Every numbered proof node thereafter uses only those interfaces, preceding definitions, and earlier nodes. Node identifiers and proposed declaration names are organizational labels, not assertions that these declarations already exist in mathlib. A dependency line lists direct mathematical prerequisites; earlier definitions and elementary library operations are implicit. The final dependency index contains no new mathematical assertions.
+
+\paragraph{One simplification.}
+If the sum of the largest $n$ disjoint scale increments has $L^{3/2}$ norm $O(\sqrt n)$, the set where arbitrarily late increments exceed $\varepsilon$ has measure $O(n^{-3/4})$ for every $n$. It is therefore null. Thus only a square-root counting estimate, not a full variation-norm theorem, is needed for convergence.
+
+\begingroup\small\tableofcontents\endgroup\clearpage
+
+\section{Imported mathematical interfaces and representation conventions}\label{sec:library}
+Only the interfaces in this section are imported without proof. They are mathematical specializations of ordinary mathlib material. The displayed assumptions are part of each interface. The named reference declarations have been checked in the public documentation; the remaining elementary operations in the same interfaces are covered by the indicated library areas. No assertion is made that a single existing declaration has exactly every displayed bundled conclusion. Such bundling is a wrapper, not an additional analytic theorem.
+
+\lib{F0}{Elementary algebra, order, topology, and finite-dimensional spaces}
+We use the complete ordered field $\R$, the complete normed field $\C$, finite sums and products, countable sets, sequences, and the usual arithmetic of nonnegative real powers. A Cauchy sequence in a complete metric space converges. The rational numbers are countable and dense in $\R$. Continuous functions on compact metric spaces are bounded and uniformly continuous. A finite-dimensional real or complex inner-product space is complete; all its linear maps are continuous. Cauchy--Schwarz, the triangle inequality, and the operator-norm inequality hold. A positive real quadratic form is an inner product after polarization. Countable unions of null sets are null.
+
+These are the standard algebraic, topological, and inner-product-space interfaces of mathlib. All finite index sets can be represented by \texttt{Fin k}, and all finite complex Hilbert spaces by \texttt{EuclideanSpace Complex (Fin k)}. We use no infinite-dimensional spectral theorem.
+
+\lib{F1}{Finite-dimensional spectral theorem}
+Every Hermitian matrix $P$ on a finite-dimensional complex Hilbert space has an orthonormal basis of eigenvectors with real eigenvalues. In this basis $P\ge0$ means that all eigenvalues are nonnegative; $P>0$ means that they are positive. Its trace is their sum. The real version holds for a selfadjoint operator on a finite-dimensional real inner-product space. Source: \cite{ml-spectrum}, in particular \texttt{Matrix.\allowbreak IsHermitian.\allowbreak spectral\_\allowbreak theorem}, \texttt{Matrix.\allowbreak IsHermitian.\allowbreak eigenvectorBasis}, and \texttt{Matrix.\allowbreak IsHermitian.\allowbreak trace\_\allowbreak eq\_\allowbreak sum\_\allowbreak eigenvalues}.
+
+Square roots, the cost, its order comparison, singular-value facts, and all trace inequalities needed here are derived below from this interface. In particular, operator monotonicity of the square root is not imported.
+
+\lib{F2}{Differential and integral calculus}
+We use the product and chain rules for real Fr\'echet derivatives, their coordinate specializations, continuity of derivatives of a smooth function, the fundamental theorem of calculus for continuously differentiable functions on a compact interval, and integration by parts on such intervals. The usual derivative formulas for $\exp$, $\log$, positive real powers, and $\arctan$ are included.
+
+We also use the finite-dimensional inverse function theorem in the following form. If $F$ is smooth on an open subset of a finite-dimensional real normed space and $DF(a)$ is invertible, there are open neighborhoods on which $F$ is a smooth bijection with smooth inverse, and the derivative of its inverse at $F(a)$ is $DF(a)^{-1}$. The strict-derivative local inverse and its smooth specialization are supplied by \cite{ml-ift}; the latter includes \texttt{ContDiffAt.\allowbreak to\_\allowbreak localInverse}. The use below is solely the polynomial map $A\mapsto A^2$ on Hermitian matrices. The required domination for differentiation under an integral is proved in Node A01, rather than silently imported.
+
+\lib{F3}{Measure and integration}
+All measures are countably additive. For nonnegative measurable functions we use Tonelli's theorem and monotone convergence, with values in $[0,\infty]$. For integrable complex- or finite-dimensional vector-valued functions we use Fubini's theorem. We use the dominated convergence theorem: if $h_n\to h$ almost everywhere and $|h_n|\le H\in L^1$, then $h\in L^1$ and $\int|h_n-h|\to0$. Fatou's lemma, countable subadditivity, and continuity from below for measures are included. Sources: \cite{ml-prod,ml-dct}.
+
+For $1\le p\le\infty$, $L^p$ has the usual norm and is complete. H\"older holds in the form
+\[
+ \|uv\|_r\le\|u\|_p\|v\|_q,\qquad 1/r=1/p+1/q,\quad r\ge1.
+\]
+The integral form of H\"older with conjugate exponents and its finite-counting-measure version are included. We use the triangle inequality in $L^p$. Sources: the $L^p$ interfaces and integral inequalities described in \cite{ml-lp,ml-mean}. Markov's estimate is also immediate from monotonicity of the integral:
+\[
+ \mu\{|h|>t\}\le t^{-p}\int|h|^p\dd\mu\qquad(t>0,p>0).
+\]
+All applications of Fubini below are on finite or sigma-finite measures and have an explicit absolute-integrability bound. Measurability of parameter integrals is part of the same integration interface.
+
+\lib{F4}{Lebesgue measure, regularity, and approximation}
+Lebesgue measure on $\R^d$ is translation-invariant, gives an axis-parallel rectangle the product of its side lengths, and is regular. If $E$ is Lebesgue measurable of finite measure and $\varepsilon>0$, it has an open superset $O$ with $|O\setminus E|<\varepsilon$. On a bounded rectangle this can be taken with finite measure. A singleton in $\R$ has measure zero.
+
+For an invertible real linear map $L:\R^d\to\R^d$, a translation $b$, and a nonnegative measurable or absolutely integrable $h$, change of variables gives
+\[
+ \int_{\R^d}h(Lx+b)\dd x=|\det L|^{-1}\int_{\R^d}h(y)\dd y.
+\]
+Only translations, dilations, coordinate permutations, and explicitly determinant-one shears are used below. A source for the linear change of variables is \cite{ml-haar}, \texttt{MeasureTheory.\allowbreak Measure.\allowbreak map\_\allowbreak linearMap\_\allowbreak addHaar\_\allowbreak eq\_\allowbreak smul\_\allowbreak addHaar}; regularity is supplied by \cite{ml-regular}.
+
+For $1\le p<\infty$, every $f\in L^p(\R^d)$ can be approximated in $L^p$ by continuous compactly supported functions. Source: \cite{ml-density}, especially \texttt{MeasureTheory.\allowbreak MemLp.\allowbreak exists\_\allowbreak hasCompactSupport\_\allowbreak eLpNorm\_\allowbreak sub\_\allowbreak le}. No density of smooth functions, special ergodic systems, or structured functions is needed.
+
+\lib{F5}{Gaussian integral and polynomial approximation}
+For $b>0$,
+\[
+ \int_{\R}e^{-bt^2}\dd t=\sqrt{\pi/b}.
+\]
+Source: \cite{ml-gaussian}, \texttt{integral\_\allowbreak gaussian}. Gaussian convolution, derivative identities, decay estimates, and the Gaussian approximation argument used later are proved below.
+
+For every continuous $F:[0,1]\to\C$ and every $\varepsilon>0$, there is a complex polynomial $P$ with $\sup_{0\le z\le1}|F(z)-P(z)|<\varepsilon$. Source: \cite{ml-bernstein}, \texttt{bernsteinApproximation\_\allowbreak uniform}, applied to the real normed vector space $\C$. We use no Tauberian theorem as an imported result.
+
+\lib{F6}{Compact products and representation of positive functionals}
+Every finite Borel measure on a compact metric space is regular. A countable product of nonempty compact metric spaces is a compact metrizable space. Its Borel sigma algebra is generated by coordinate cylinders. Continuous functions agreeing on a dense subset agree everywhere. Finite Borel measures agreeing on a generating pi-system that contains the whole space agree on the whole sigma algebra.
+
+We use the following specialization of the Riesz--Markov--Kakutani theorem. If $K$ is compact metric and $L:C(K,\R)\to\R$ is positive and real-linear with $L(1)=1$, there is a regular Borel probability measure $\nu$ on $K$ such that
+\[
+ L(h)=\int_K h\dd\nu\qquad(h\in C(K,\R)).
+\]
+Such a regular measure is unique. Source: \cite{ml-rmk}, \texttt{RealRMK.\allowbreak rieszMeasure}, \texttt{RealRMK.\allowbreak integral\_\allowbreak rieszMeasure}, and its uniqueness statements. On a compact space, every continuous function has compact support, so the library's compact-support formulation applies. The inverse-limit construction itself is proved below, not imported.
+
+\lib{F7}{Measure-preserving maps and representatives}
+A measurable map $T:(X,\mu)\to(Y,\nu)$ is measure-preserving when its pushforward measure is $\nu$. Consequently
+\[
+ \int_Y h\dd\nu=\int_X h\circ T\dd\mu
+\]
+for nonnegative measurable or integrable $h$. Compositions of such maps preserve measure and pullbacks preserve $L^p$ norms. Source: \cite{ml-mp,ml-lp}. These are substitution identities, not ergodic theorems.
+
+Measurable complex functions can be used as representatives of their almost-everywhere equivalence classes. If $f$ and $g$ agree almost everywhere, their pullbacks along any countable family of measure-preserving maps agree outside a common null set. An essentially bounded function has an everywhere bounded measurable representative: replace its values by zero where the bound fails. In continuous-time integrals, preservation of measure and Tonelli on each bounded time interval show that changing a representative has no effect for almost every base point. For convenience the flow arguments are carried out with everywhere bounded representatives from the beginning.
+
+\paragraph{Formalization conventions.}
+A probability space is a type with a measurable-space structure, a measure, and the assertion that its total mass is one. An invertible transformation includes a measurable inverse and the two inverse identities; measure preservation alone does not supply invertibility. A flow is an actual jointly measurable $\R$-action, not merely a separately specified collection of almost-everywhere maps. The suspensions below satisfy that definition. The finite-matrix cost is evaluated only on Hermitian matrices supported on the indicated positive matrix. When implementing it, use the real space of supported Hermitian matrices and the inverse of the restricted Lyapunov operator. Never use the inverse on its ambient kernel.
+
+\section{Elementary analytic preparation}\label{sec:prelim}
+
+\bpnode{A01}{F0--F3}{integral_differentiation_local_domination}
+\begin{lemma}[Differentiation under the integral]\label{lem:diff-integral}
+Let $U\subset\R^d$ be open, let $(Z,\nu)$ be a measure space, and let $h:U\times Z\to\C$ be jointly measurable. Suppose that outside a fixed null set in $Z$, the function $h(\cdot,z)$ is $C^k$, where $k\ge1$. Around each $a\in U$ assume there is a closed ball $B\subset U$ with $a$ in its interior, an integrable function $H_B$, and an integrable function $|h(a,\cdot)|$, such that all partial derivatives of orders $1$ through $k$ are bounded in absolute value by $H_B(z)$ on $B$. Then $\int_Zh(a,z)\dd\nu(z)$ is $C^k$ in $a$, and its partial derivatives through order $k$ are obtained by integrating the corresponding partial derivatives of $h$. The same statement holds for finite-dimensional matrix-valued functions, entry by entry.
+\end{lemma}
+\begin{proof}
+On a smaller ball around $a$, integrate the first derivatives along a line segment. The fundamental theorem of calculus bounds $|h(b,z)|$ by $|h(a,z)|+C_BH_B(z)$, so all integrals exist. A difference quotient in a coordinate direction is the average of that partial derivative over the segment; its absolute value is at most $H_B(z)$. It converges almost everywhere to the partial derivative. Dominated convergence proves the derivative formula. The derivatives so obtained are continuous by dominated convergence, since their pointwise integrands are continuous in the parameter. Repeat the same argument with each already differentiated integrand until order $k$. There are only finitely many coordinates and derivatives involved, so the null sets can be combined. Applying this proof to real and imaginary parts and then to finitely many matrix entries proves the last assertion.
+\end{proof}
+
+\bpnode{A02}{A01, F0--F5}{gaussian_calculus}
+\begin{lemma}[Gaussian identities and domination]\label{lem:gaussian-calculus}
+For $\sigma>0$, define
+\[
+ g_\sigma(t)=(2\pi\sigma)^{-1/2}e^{-t^2/(2\sigma)}.
+\]
+These functions have integral one and satisfy, for nonnegative integers $i,j$,
+\[
+ g_\sigma^{(i)}*g_\tau^{(j)}=g_{\sigma+\tau}^{(i+j)},\qquad
+ 2\partial_\sigma g_\sigma=g_\sigma'',
+\]
+\[
+ g_{as}^{(j)}(t)=s^{-(j+1)/2}g_a^{(j)}(t/\sqrt s),\qquad a,s>0.
+\]
+Every derivative of a Gaussian is a polynomial times that Gaussian. It is integrable, and its polynomially weighted absolute value tends to zero at infinity. Derivatives with respect to positive variance have the same properties, locally uniformly in the variance. In particular, for fixed $a>0$ and $j$, the functions $s^{j/2}g_{as}^{(j)}$ have $L^1$ norm independent of $s$.
+\end{lemma}
+\begin{proof}
+Normalization follows from F5 with $b=1/(2\sigma)$. Direct differentiation gives $g_\sigma'=-(t/\sigma)g_\sigma$ and $g_\sigma''=(t^2/\sigma^2-1/\sigma)g_\sigma$, proving the heat identity. Induction by the product rule proves the polynomial formula for higher derivatives, including variance derivatives. For $\delta>0$ and an integer $m\ge0$, the function $r^me^{-\delta r^2/2}$ is bounded on $[0,\infty)$: for $m>0$, its derivative changes sign at $r=\sqrt{m/\delta}$, and $m=0$ is immediate. Hence
+\[
+ |t|^m e^{-\delta t^2}\le C_{m,\delta}e^{-\delta t^2/2}.
+\]
+This proves all asserted integrability and decay, by the Gaussian integral; it also proves the locally uniform bounds when the variance is in a compact subinterval of $(0,\infty)$. Direct substitution proves the scaling identity and, on changing $t$ to $\sqrt s\,t$, the $L^1$ statement.
+
+For convolution complete the square:
+\[
+ \frac{(t-d)^2}{\sigma}+\frac{d^2}{\tau}
+ =\frac{t^2}{\sigma+\tau}
+  +\frac{\sigma+\tau}{\sigma\tau}
+       \left(d-\frac{\tau t}{\sigma+\tau}\right)^2.
+\]
+Integrating the product $g_\sigma(t-d)g_\tau(d)$ with the Gaussian integral gives $g_{\sigma+\tau}(t)$. The preceding domination and A01 permit any number of derivatives in $t$ to pass under this integral. A derivative on the second factor can be moved to the first by integration by parts: its boundary term is zero by the proved decay, and the derivative in $d$ of the first factor has the opposite sign to its derivative in $t$. Iteration gives the formula for arbitrary $i,j$. No distributional convolution theorem is needed.
+\end{proof}
+
+\bpnode{A03}{F0, F3--F4}{finite_measurable_menu_rectangular_approximation}
+\begin{lemma}[Finite measurable choices]\label{lem:rect-menu}
+Let a bounded rectangle $Q\subset\R^2$ be partitioned into finitely many Lebesgue-measurable sets, labelled by a finite set of choices. There is a sequence of choices constant on finite rectangular partitions of $Q$ that eventually agrees with the given choice at almost every point of $Q$.
+\end{lemma}
+\begin{proof}
+Write the measurable parts as $E_1,\ldots,E_m$. Regularity gives an open superset $O_j$ with $|(O_j\cap Q)\setminus E_j|<\varepsilon$. The portion of $O_j$ in the interior of $Q$ is the union of countably many open rectangles with rational endpoints whose closures are contained in $O_j$. Indeed, every point has a sufficiently small rational rectangle around it. Finite partial unions increase to this set. Continuity from below and the finite measure of $Q$ give a finite union $F_j\subset O_j\cap Q$ with $|(O_j\cap Q)\setminus F_j|<\varepsilon$, ignoring the null boundary of $Q$. Thus $|E_j\mathbin\triangle F_j|<2\varepsilon$.
+
+Assign a point the least index $j$ for which it belongs to $F_j$, and assign points in no $F_j$ to $m$. Except on $\bigcup_j(E_j\mathbin\triangle F_j)$, this agrees with the original partition. All rectangle boundaries form finitely many vertical and horizontal lines. Partitioning by their coordinates makes the assignment rectangular off those lines; arbitrary values on the lines do not affect integrals. Choose the approximations so that the incorrect-assignment set $D_k$ has measure at most $2^{-k}$. For every $K$,
+\[
+ \left|\bigcup_{k\ge K}D_k\right|\le\sum_{k\ge K}2^{-k}.
+\]
+The set of points in infinitely many $D_k$ therefore has measure zero. Outside it, the assignments eventually agree. This also covers completed Lebesgue-measurable parts, since the regular approximation and null-set conclusions are unchanged by completion.
+\end{proof}
+
+\bpnode{A04}{F0, F3--F4}{lattice_sampling_dominated_convergence}
+\begin{lemma}[Lattice sampling]\label{lem:lattice-limit}
+Let $H:\R^d\to\C$ be bounded, vanish outside a bounded set, and be continuous except possibly on finitely many coordinate hyperplanes. Then, as $h=1/N\downarrow0$,
+\[
+ h^d\sum_{k\in\Z^d}H(hk)\longrightarrow\int_{\R^d}H(x)\dd x.
+\]
+Every sum is finite. In particular this applies to $|G|^3$ for $G$ continuous with compact support.
+\end{lemma}
+\begin{proof}
+For $x\in\R^d$ set $x_h=h\lfloor x/h\rfloor$, with floor taken in each coordinate. Then $x_h\to x$. At every continuity point, $H(x_h)\to H(x)$. The exceptional hyperplanes have measure zero: on a bounded box this follows from the zero measure of a singleton and Tonelli, and the whole space is a countable union of boxes. For $h\le1$, all sampled functions are bounded by the same constant times the indicator of a fixed enlarged box. Dominated convergence gives convergence of their integrals. Each sampled function is constant on the half-open cubes $hk+[0,h)^d$, whose measures are $h^d$. Summing their integrals proves the identity and the asserted limit. This proof specifies the limit argument rather than importing a Riemann-sum theorem.
+\end{proof}
+
+\bpnode{A05}{F0, F3--F4}{nonnegative_Lp_norm_test}
+\begin{lemma}[Nonnegative norming tests]\label{lem:norm-test}
+Suppose $U\ge0$ and $U\in L^{3/2}(\R^2)$. If
+\[
+ \int HU\le B\|H\|_3
+\]
+for every nonnegative continuous compactly supported $H$, then $\|U\|_{3/2}\le B$.
+\end{lemma}
+\begin{proof}
+Put $H_0=\sqrt U\in L^3$. Approximate $H_0$ in $L^3$ by complex continuous compactly supported $H_k$ using F4, and replace $H_k$ by $|H_k|$. Since $||H_k|-H_0|\le|H_k-H_0|$, the convergence is unchanged. H\"older shows $\int U|H_k|\to\int U^{3/2}$, and norm continuity gives $\|H_k\|_3\to(\int U^{3/2})^{1/3}$. Consequently
+\[
+ \int U^{3/2}\le B\left(\int U^{3/2}\right)^{1/3}.
+\]
+If the integral is zero the conclusion is immediate; otherwise divide by its one-third power. The result is precisely $\|U\|_{3/2}\le B$.
+\end{proof}
+
+\bpnode{A06}{F0, F3--F4}{L1_kernel_bilinear_bound}
+\begin{lemma}[An integrable-kernel bound]\label{lem:L1-kernel}
+For $F,G\in L^3(\R^2)$ and $K\in L^1(\R)$ the absolutely convergent almost-everywhere integral
+\[
+ B_K(F,G)(x,y)=\int_\R F(x+t,y)G(x,y+t)K(t)\dd t
+\]
+defines an $L^{3/2}$ function with
+\[
+ \|B_K(F,G)\|_{3/2}\le\|K\|_1\|F\|_3\|G\|_3.
+\]
+The output varies continuously in the inputs in these norms for a fixed kernel.
+\end{lemma}
+\begin{proof}
+The result is immediate for $K=0$ in $L^1$. Otherwise use H\"older on the probability measure $|K(t)|\dd t/\|K\|_1$ to obtain
+\[
+ \left(\int|F(x+t,y)G(x,y+t)||K(t)|\dd t\right)^{3/2}
+ \le\|K\|_1^{1/2}\int|F(x+t,y)G(x,y+t)|^{3/2}|K(t)|\dd t.
+\]
+Tonelli and Cauchy--Schwarz in $(x,y)$ bound the integral of the right side by $\|K\|_1^{3/2}\|F\|_3^{3/2}\|G\|_3^{3/2}$, using translation invariance for each input. It is finite, so the inner absolute integral is finite almost everywhere. Taking the two-thirds power gives the estimate. For continuity expand
+\[
+ B_K(F,G)-B_K(F',G')=B_K(F-F',G)+B_K(F',G-G')
+\]
+and apply the estimate to both terms. Representatives may be chosen measurably, and Fubini shows that changing them does not change the output almost everywhere.
+\end{proof}
+
+
+\bpnode{A07}{F0, F3, F6}{compact_Borel_measure_determined_by_continuous_tests}
+\begin{lemma}[Continuous tests determine a compact metric measure]\label{lem:compact-measure-unique}
+Let $K$ be a compact metric space and let $\mu,\nu$ be finite Borel measures on $K$. If $\int h\dd\mu=\int h\dd\nu$ for every real continuous $h$ on $K$, then $\mu=\nu$.
+\end{lemma}
+\begin{proof}
+Fix a nonempty closed subset $F\subset K$. It is compact. For $x\in K$, the continuous function $y\mapsto d(x,y)$ attains its minimum on $F$; denote this minimum by $d(x,F)$. The triangle inequality, followed by taking minima, gives
+\[
+ |d(x,F)-d(x',F)|\le d(x,x').
+\]
+Thus the distance function is continuous, and its minimum characterization shows that $d(x,F)=0$ exactly on $F$. The continuous functions $h_n(x)=\max(1-n d(x,F),0)$, $n\ge1$, are bounded between zero and one and converge pointwise to $\one_F$. Dominated convergence for each finite measure gives $\mu(F)=\nu(F)$ from the assumed equality of their integrals. The empty closed set has measure zero for both measures. Closed sets form a pi-system containing $K$ and generate the Borel sigma algebra, since their complements are the open sets. The finite-measure uniqueness interface in F6 now gives $\mu=\nu$. No regularity assumption on the two given measures was used.
+\end{proof}
+
+\section{Finite-dimensional matrix inequalities}\label{sec:matrix}
+All Hilbert spaces in this section are finite dimensional and complex. The Hilbert--Schmidt inner product is $\langle A,B\rangle_{\HS}=\tr(A^*B)$. A Hermitian matrix $K$ is supported on a positive matrix $P$ when it vanishes on $\ker P$; equivalently, $K$ acts only on $(\ker P)^\perp$. Put
+\[
+ \Phi(P)=\tr(P^{3/2}),\qquad P\geq0.
+\]
+On Hermitian matrices supported on $P$, define the real bilinear form
+\[
+ b_P(K,L)=\frac32\Rea\left\langle K,
+ (\mathsf L_{\sqrt P}+\mathsf R_{\sqrt P})^{-1}L\right\rangle_{\HS},
+ \qquad b_P(K)=b_P(K,K).
+\]
+Here $\mathsf L_A X=AX$, $\mathsf R_A X=XA$, and the inverse is restricted to matrices on $(\ker P)^\perp$. The cost is zero on the zero space. In an eigenbasis of $P$, with positive eigenvalues $p_i$, this says
+\[
+ b_P(K)=\frac32\sum_{i,j}\frac{|K_{ij}|^2}{\sqrt{p_i}+\sqrt{p_j}}.
+\]
+
+\bpnode{M01}{F0--F1}{supported_Gram_spectral_facts}
+\begin{lemma}[Spectral consequences and the supported space]\label{lem:gram-facts}
+The positive square root of a positive matrix exists and is unique. It is invariant under unitary conjugation and extension by zero. For a rectangular matrix $R$,
+\[
+ \ker(R^*R)=\ker R,\qquad \Phi(R^*R)=\Phi(RR^*)\le\|R\|_{\HS}^3.
+\]
+The two Grams have the same positive eigenvalues with multiplicities. The operator $K\mapsto\sqrt P K+K\sqrt P$ is positive definite and invertible on the real space of supported Hermitian matrices. On that space $b_P$ is a positive definite quadratic form with the eigenbasis formula above, and
+\[
+ |b_P(K,L)|\le b_P(K)^{1/2}b_P(L)^{1/2}.
+\]
+The zero-dimensional case is understood as the zero form. All these assertions are invariant under unitary identifications of subspaces.
+\end{lemma}
+\begin{proof}
+Diagonalize $P$ using F1 and replace each eigenvalue $p\ge0$ by $\sqrt p$. If another positive $A$ has $A^2=P$, it commutes with $P$, hence preserves its eigenspaces. On the $p$-eigenspace its nonnegative eigenvalues must square to $p$, so it equals $\sqrt p$ times the identity there. This proves uniqueness and both invariances.
+
+For the Gram facts use $\langle R^*Rx,x\rangle=\|Rx\|^2$. If $e_i$ are orthonormal eigenvectors for the positive eigenvalues $\rho_i^2$ of $R^*R$, then $f_i=Re_i/\rho_i$ are orthonormal, and $R^*f_i=\rho_i e_i$. The matrix $R$ vanishes on the remaining eigenspace. Extending the $f_i$ to an orthonormal basis gives singular bases in which $R$ has precisely the diagonal entries $\rho_i$ and zeros elsewhere. Thus both Grams have positive eigenvalues $\rho_i^2$, and their energies equal $\sum_i\rho_i^3$. Finally
+\[
+ \sum_i\rho_i^3\le\left(\sum_i\rho_i^2\right)^{3/2}=\|R\|_{\HS}^3,
+\]
+since each $\rho_i$ is at most $(\sum_j\rho_j^2)^{1/2}$.
+
+In an eigenbasis of $P$ restricted to $(\ker P)^\perp$, left plus right multiplication by $\sqrt P$ multiplies entry $(i,j)$ by the positive real number $\sqrt{p_i}+\sqrt{p_j}$. The inverse preserves Hermitian matrices and has reciprocal multipliers. This proves its positive definiteness and the displayed formula for $b_P$. Cauchy--Schwarz for the weighted sum of squared entries proves the bilinear inequality. Equivalently this is Cauchy--Schwarz in the positive real inner product $b_P$. The definitions by linear operators also show that the formula does not depend on the chosen eigenbasis.
+\end{proof}
+
+\bpnode{M02}{M01, F0--F3}{matrix_cost_differentiation_order_insertion}
+\begin{lemma}[Differentiation and comparison]\label{lem:matrix-basic}
+On a fixed support, $\Phi$ is smooth, its derivative is
+\[
+ d\Phi_P(K)=\frac32\tr(\sqrt P K),
+\]
+and its Hessian is $b_P$. If $P\leq aQ$, where $a\geq1$, a Hermitian matrix supported on $P$ is supported on $Q$ and
+\[
+ b_P(K)\geq a^{-1/2}b_Q(K).
+\]
+For a rectangular matrix $R$ and a Hermitian matrix $D$ on its row space,
+\[
+ b_{R^*R}(R^*DR)\leq\frac34\|D\|_{\op}^2\Phi(R^*R).
+\]
+All these formulas are unchanged by simultaneous unitary conjugation or extension by zero.
+\end{lemma}
+\begin{proof}
+Restrict first to a positive definite matrix $P$ and let $A=\sqrt P$. The positive cone is open: if the least eigenvalue of $A$ is $a>0$, a Hermitian perturbation of operator norm less than $a/2$ stays positive. The squaring map on the real space of Hermitian matrices has derivative $X\mapsto AX+XA$. This is invertible by the entry formula in Lemma~\ref{lem:gram-facts}. The inverse function theorem F2 gives a smooth local inverse within the positive cone. By uniqueness of the positive square root, that inverse is the square-root map. Differentiating $A^2=P$ now shows that its derivative $X$ in direction $K$ solves $AX+XA=K$. Differentiating $\tr(P\sqrt P)$ and using $\tr(PX)=\frac12\tr(AK)$ gives the displayed first derivative. Differentiating it once more gives the stated Hessian.
+
+Inversion reverses order for positive definite matrices. Indeed, if $0<X\le Y$, the positive matrix $C=X^{-1/2}YX^{-1/2}$ satisfies $C\ge I$. Diagonalizing $C$ gives $C^{-1}\le I$. Since $C^{-1}=X^{1/2}Y^{-1}X^{1/2}$, conjugation by $X^{-1/2}$ yields $Y^{-1}\le X^{-1}$. Also
+\[
+ \sqrt P=\frac1\pi\int_0^\infty P(P+tI)^{-1}\,\frac{\dd t}{\sqrt t}.
+\]
+For a scalar $p>0$, substitute $t=py^2$; the right side becomes $(2\sqrt p/\pi)\int_0^\infty(1+y^2)^{-1}\dd y=\sqrt p$, using the antiderivative $\arctan y$. For $p=0$ both sides vanish. The matrix integral converges in norm: near zero its integrand is bounded by $t^{-1/2}$, and near infinity by $\|P\|_{\op}t^{-3/2}$. Diagonalizing $P$ proves the matrix identity. Since $P(P+tI)^{-1}=I-t(P+tI)^{-1}$, this shows that square root preserves order. Hence
+\[
+ \sqrt{P+\eta I}\leq\sqrt a\sqrt{Q+\eta I},\qquad \eta>0.
+\]
+Left plus right multiplication preserves this order on Hilbert--Schmidt space. Inverting those operators gives the claimed cost comparison for the regularized matrices. The inequality $P\leq aQ$ implies $\ker Q\subseteq\ker P$. Consequently all entries of $K$ meeting either relevant kernel vanish. The eigenbasis formula for the cost permits passage to the limit as $\eta\downarrow0$ and proves the support assertion too.
+
+For the insertion estimate, let $\rho_i>0$ be the singular values of $R$. In the corresponding singular bases the cost is
+\[
+ \frac32\sum_{i,j}\frac{\rho_i^2\rho_j^2}{\rho_i+\rho_j}|D_{ij}|^2,
+\]
+where $D$ can be replaced by its compression to the left singular subspace. For $x,y\geq0$,
+\[
+ \frac{x^2y^2}{x+y}\leq\frac{(xy)^{3/2}}2\leq\frac{x^3+y^3}{4}
+\]
+with the value zero at $x=y=0$. Every row and column of the compressed $D$ has squared norm at most $\|D\|_{\op}^2$. Summing gives $\frac34\|D\|_{\op}^2\sum_i\rho_i^3$, as required. The invariance assertions follow directly from spectral calculus.
+\end{proof}
+
+\bpnode{M03}{M01--M02, F3}{matrix_cost_probability_average}
+\begin{lemma}[Averaging the cost]\label{lem:convexity}
+Let $\nu$ be a probability measure and suppose measurable matrices $T_z\geq0$ all have the same support $E$ almost everywhere. Let $K_z$ be Hermitian and supported there. Assume $\int(\|T_z\|_{\op}+\|K_z\|_{\op})\dd\nu(z)<\infty$. Then
+\[
+ b_{\int T_z\dd\nu(z)}\left(\int K_z\dd\nu(z)\right)
+ \leq\int b_{T_z}(K_z)\dd\nu(z).
+\]
+The right side is allowed to be infinite.
+\end{lemma}
+\begin{proof}
+Restrict to $E$; the assertion is immediate if $E=0$. The average of $T_z$ is positive definite on $E$. Put $A=\int\sqrt{T_z}\dd\nu(z)$. For every vector $x$, Cauchy--Schwarz gives
+\[
+ \|Ax\|^2\leq\int\|\sqrt{T_z}x\|^2\dd\nu(z)
+ =\left\langle\left(\int T_z\dd\nu(z)\right)x,x\right\rangle.
+\]
+Square-root monotonicity therefore gives
+$A\leq\sqrt{\int T_z\dd\nu(z)}$.
+On a real Hilbert space, for a positive definite operator $M$, completing the square gives
+\[
+ \langle K,M^{-1}K\rangle
+ =\sup_X\{2\langle K,X\rangle-\langle X,MX\rangle\}.
+\]
+Apply this on Hermitian matrices with their real Hilbert--Schmidt inner product. For a fixed $X$, the expression on the right for the averaged pair is at most the average of the corresponding expressions for $(T_z,K_z)$, by the inequality for square roots. Multiplying by $3/2$, taking the supremum, and bounding each fixed-test integral by the integral of the pointwise supremum proves the lemma. The latter is measurable: on the fixed positive support the inverse and square-root maps, and hence the cost, are continuous; equivalently the supremum can be taken over a countable dense set of test matrices. This argument requires no uniform lower bound on the positive eigenvalues.
+\end{proof}
+
+\bpnode{M04}{M01--M02, F2--F3}{Gram_energy_entry_change}
+\begin{lemma}[Entry changes]\label{lem:entry}
+For $R(z)=(1-z)R_-+zR_+$, $0\leq z\leq1$, and $D=R_+-R_-$,
+\[
+ \Phi(R_+^*R_+)-\Phi(R_-^*R_-)
+ =3\int_0^1\Rea\langle R(z)\sqrt{R(z)^*R(z)},D\rangle_{\HS}\dd z.
+\]
+For every entry of a rectangular matrix $R$,
+\[
+ |(R\sqrt{R^*R})_{ij}|
+ \leq\|\operatorname{row}_iR\|_2\|\operatorname{col}_jR\|_2.
+\]
+\end{lemma}
+\begin{proof}
+Differentiate $\tr((R(z)^*R(z)+\eta I)^{3/2})$ with $\eta>0$, using Lemma~\ref{lem:matrix-basic}. Its derivative is the integrand in the first formula with $\sqrt{R(z)^*R(z)+\eta I}$ in place of the square root. Spectral calculus bounds the operator norm of the difference of these square roots by $\sqrt\eta$, uniformly in $z$. Integrate and let $\eta\downarrow0$. For the entry estimate, apply Cauchy--Schwarz to row $i$ of $R$ and column $j$ of $\sqrt{R^*R}$. The latter column has squared norm $(R^*R)_{jj}$, which is the squared norm of column $j$ of $R$.
+\end{proof}
+
+For the next lemma, indices $v$ are cyclic modulo three. Let $W_v:H_{v+1}\to H_v$. Define the two-block row matrices and their Grams by
+\[
+ R_v=[W_v\ \ W_{v-1}^*],\qquad T_v=R_v^*R_v,\qquad S_v=R_vR_v^*.
+\]
+\bpnode{M05}{M01--M02, F0}{cyclic_trace_control}
+\begin{lemma}[Cyclic trace]\label{lem:trace}
+If $D_v$ is Hermitian on $H_v$ and $D_* =\max_v\|D_v\|_{\op}$, then
+\[
+ |\tr(D_0W_0D_1W_1D_2W_2)|
+ \leq\frac53D_*\sum_{v=0}^2b_{T_v}(R_v^*D_vR_v).
+\]
+\end{lemma}
+\begin{proof}
+On $H_0\oplus H_1\oplus H_2$, let $M$ be Hermitian with zero diagonal blocks, blocks $M_{v,v+1}=W_v$, and opposite blocks $M_{v+1,v}=W_v^*$. Put $D=\operatorname{diag}(D_0,D_1,D_2)$ and let $P_v$ be the coordinate projection. The matrices $MP_vM$ and $MP_vDM$ are $T_v$ and $R_v^*D_vR_v$, respectively, after permuting coordinates and padding by zero. Also $MP_vM\leq M^2$. By comparison and the elementary inequality $\sum_{v=0}^2b(K_v)\geq\frac13b(\sum_vK_v)$ for a positive quadratic form,
+\[
+ \mathcal E:=\sum_vb_{T_v}(R_v^*D_vR_v)\geq\frac13b_{M^2}(MDM).
+\]
+Diagonalize $M$, with real eigenvalues $m_i$, and order $q_i=|m_i|$ decreasingly. In this basis set
+\[
+ Q=\sum_{q_i+q_j>0}\frac{q_i^2q_j^2}{q_i+q_j}|D_{ij}|^2.
+\]
+The last inequality says $\mathcal E\geq Q/2$. Define nonnegative numbers
+\[
+ A_i=q_i^3|D_{ii}|^2,\qquad E_i=q_i\sum_{j>i}q_j^2|D_{ij}|^2,
+ \qquad A=\sum_iA_i,\quad E=\sum_iE_i.
+\]
+The diagonal summands of $Q$ total $A/2$. Pairing its two off-diagonal summands for $i<j$, and using $q_i\geq q_j$, gives $Q\geq A/2+E$.
+
+Expand $\tr((DM)^3)$ and group triples of indices by their smallest index $i$. When $i$ occurs just once, the group is
+$3m_i\sum_{j,k>i}m_jm_kD_{ij}D_{jk}D_{ki}$. Its absolute value is at most $3D_*E_i$, by applying the operator norm bound to the vector $(m_jD_{ji})_{j>i}$. When $i$ occurs twice, the absolute value is at most
+\[
+ 3q_i^2|D_{ii}|\sum_{j>i}q_j|D_{ij}|^2
+ \leq3D_*\sqrt{A_iE_i},
+\]
+by Cauchy--Schwarz and the bound on the norm of a row of $D$. The all-equal term is at most $D_*A_i$. Summing, then applying Cauchy--Schwarz in $i$, yields
+\[
+ |\tr((DM)^3)|\leq D_*(A+3E+3\sqrt{AE})
+ \leq5D_*(A/2+E)\leq5D_*Q\leq10D_*\mathcal E.
+\]
+The middle inequality follows, for example, from $3\sqrt{AE}\leq\frac32A+\frac32E$.
+
+Because the diagonal blocks of $M$ vanish, its cubic block trace is
+\[
+ \tr((DM)^3)=6\Rea\tr(D_0W_0D_1W_1D_2W_2).
+\]
+Multiply $W_0$ by a complex number of modulus one to make the trace on the right nonnegative real. This changes $R_0$ and $R_1$ by right unitary block multipliers, and leaves each of their costs unchanged; $R_2$ is unchanged. Apply the preceding estimate after this modification and divide by six.
+\end{proof}
+
+\section{Gaussian energies with an averaged center plane}\label{sec:heat}
+\subsection{Finite arrays and differential identities}
+Fix a mesh $h>0$, finitely many nodes $u_i=ih$, $-L\leq i\leq L$, and complex arrays $A_v(i,j)$. Set
+\[
+ n_v=\left(\sum_{i,j=-L}^L h^2|A_v(i,j)|^3\right)^{1/3}.
+\]
+For centers $p_v\in\R$ and variances $\sigma_v>0$, put
+\[
+ w_v(i)=h g_{\sigma_v}(u_i-p_v),\qquad
+ W_v(i,j)=A_v(i,j)\sqrt{w_v(i)w_{v+1}(j)}.
+\]
+Use the row matrices $R_v$, $T_v$, $S_v$ above, and put $e_v=\Phi(T_v)=\Phi(S_v)$. Define
+\[
+ C_{v,v+1}=W_v,\qquad C_{v,v-1}=W_{v-1}^*,\qquad
+ N_v=\operatorname{diag}_i((u_i-p_v)/\sigma_v).
+\]
+The following insertions and costs will be used:
+\[
+ U_v=R_v^*N_vR_v,\qquad P_{v,w}=C_{v,w}N_wC_{v,w}^*\quad(w\ne v),
+\]
+\[
+ V_v=b_{T_v}(U_v),\qquad Y_{v,w}=b_{S_v}(P_{v,w}),\qquad
+ Z_v=b_{S_v}(P_{v,v+1},P_{v,v-1}).
+\]
+All insertions have the required supports, by Lemmas~\ref{lem:gram-facts} and \ref{lem:matrix-basic}. For example, $R^*DR$ annihilates $\ker R$; a column insertion is obtained from the full adjoint row matrix by padding the inserted diagonal matrix with zero on the other block.
+
+The plane $\Pi_d=\{p_0+p_1+p_2=d\}$ is always equipped with measure
+\[
+ \int_{\Pi_d}H\dd\pi_d
+ =\int_{\R^2}H(p_0,p_1,d-p_0-p_1)\dd p_0\dd p_1.
+\]
+Any other pair of centers can be used as free coordinates, with Jacobian of absolute value one. If $\sigma_i=\alpha_i s$, define
+\[
+ J_v(d,s)=\int_{\Pi_d}e_v\dd\pi_d,\qquad \Sigma_\alpha=\alpha_0+\alpha_1+\alpha_2.
+\]
+
+\bpnode{H01}{A01--A02, M01--M02, F3--F4}{finite_array_heat_identities}
+\begin{lemma}[Heat identities]\label{lem:heat-id}
+For fixed arrays and positive rates $\alpha_i$, the following identities hold:
+\[
+ 2\partial_s e_v=\sum_i\alpha_i\partial_{p_i}^2e_v
+ -\alpha_vV_v-\sum_{w\ne v}\alpha_wY_{v,w},
+\]
+\[
+ \partial_{p_{v+1}}\partial_{p_{v-1}}e_v=Z_v,
+\]
+\[
+ 2\partial_sJ_v=\Sigma_\alpha\partial_d^2J_v
+ -\int_{\Pi_d}\left(\alpha_vV_v+\sum_{w\ne v}\alpha_wY_{v,w}\right)\dd\pi_d,
+ \qquad \partial_d^2J_v=\int_{\Pi_d}Z_v\dd\pi_d.
+\]
+On compact positive scale intervals, plane integrals of the absolute values of the derivatives used here grow at most polynomially in $|d|$.
+\end{lemma}
+\begin{proof}
+Every row matrix has the form $D_{\rm row}R^0D_{\rm col}$, with positive invertible diagonal multipliers. Its rank is constant. To check smoothness even when the Gram is singular, factor the fixed rank-$k$ matrix as $R^0=XY^*$ with $X,Y$ of full column rank. Write $X'=D_{\rm row}X$, $Y'=D_{\rm col}Y$, $P'=X'^*X'$, $Q'=Y'^*Y'$. The matrix $RR^*$ equals $X'Q'X'^*$. Apply Lemma~\ref{lem:gram-facts} to $X'Q'^{1/2}$: its other Gram is the positive definite matrix $Q'^{1/2}P'Q'^{1/2}$, and their positive eigenvalues agree. Thus $\Phi(RR^*)$ is smooth; rank zero is immediate.
+
+For $w=h g_\sigma(u-p)$ and $N=(u-p)/\sigma$,
+\[
+ \partial_pw=Nw,\qquad \partial_p^2w=(N^2-\sigma^{-1})w,
+ \qquad 2\partial_\sigma w=\partial_p^2w.
+\]
+With column weights fixed, $T_v$ depends linearly on the row density and has fixed support. Therefore $\partial_{p_v}T_v=U_v$ and $2\partial_{\sigma_v}T_v=\partial_{p_v}^2T_v$. The Hessian chain rule gives
+$2\partial_{\sigma_v}e_v=\partial_{p_v}^2e_v-V_v$.
+For $w\ne v$, use $S_v$ instead. It depends linearly on that column density, has fixed support, and has center derivative $P_{v,w}$. This gives the corresponding formula with $Y_{v,w}$. Summing the variance derivatives proves the first identity. The two summands of $S_v$ depend on different column densities. Its mixed column derivative vanishes, leaving precisely the Hessian term $Z_v$ in the second identity.
+
+Here are bounds justifying every integration and differentiation. Lemma~\ref{lem:matrix-basic} gives
+\[
+ V_v\leq\tfrac34\|N_v\|_{\op}^2e_v,\qquad
+ Y_{v,w}\leq\tfrac34\|N_w\|_{\op}^2e_v,\qquad
+ 2|Z_v|\leq Y_{v,v+1}+Y_{v,v-1}.
+\]
+For a row insertion, $|\tr(\sqrt{T_v}R_v^*BR_v)|\leq\|B\|_{\op}e_v$, because $R_v\sqrt{T_v}R_v^*$ is positive with trace $e_v$. The analogous bound for column insertions follows using $S_v$. The Gaussian formulas and the chain rule consequently bound each first derivative and each second derivative appearing above by a polynomial in the centers times $e_v$, uniformly on compact positive scale intervals. Also
+\[
+ e_v\leq\bigl(\|W_v\|_{\HS}^2+\|W_{v-1}\|_{\HS}^2\bigr)^{3/2}
+ \leq\sqrt2\bigl(\|W_v\|_{\HS}^3+\|W_{v-1}\|_{\HS}^3\bigr).
+\]
+For fixed finite arrays, each edge term is bounded by $C\exp(-\delta(p_i^2+p_j^2))$ in its two endpoint centers, with $C,\delta>0$ uniform on a compact positive scale interval. This follows from $(u-p)^2\ge p^2/2-u^2$ and the finite node set. If $|d|\le D$ and $p_0+p_1+p_2=d$, then for every pair of distinct indices $i,j$,
+\[
+ p_0^2+p_1^2+p_2^2\le4(p_i^2+p_j^2)+3D^2.
+\]
+Thus a polynomial times any of these endpoint Gaussians has an integrable majorant in every plane chart, locally uniformly in $d$ and $s$. Lemmas~\ref{lem:diff-integral} and \ref{lem:gaussian-calculus} justify all derivatives. For unrestricted $d$, use the two endpoint centers as the free coordinates of each bounding term; the remaining center is $d$ minus their sum. Integrating the polynomial against their Gaussian leaves at most a polynomial in $|d|$.
+
+Choose $p_i$ as the dependent coordinate and differentiate twice in $d$ to obtain $\partial_d^2J_v=\int_{\Pi_d}\partial_{p_i}^2e_v\dd\pi_d$. To get the mixed version, differentiate once with $p_{v+1}$ dependent, change to the chart with $p_{v-1}$ dependent, and differentiate again. The resulting integral is that of $Z_v$. Integrating the first identity now proves the remaining formulas.
+\end{proof}
+
+\bpnode{H02}{M01--M02, H01}{neighbor_cost_comparison}
+\begin{lemma}[Comparison between neighboring rows]\label{lem:neighbor}
+For every vertex $w$,
+\[
+ Y_{w+1,w}+Y_{w-1,w}\leq\sqrt2\,V_w.
+\]
+\end{lemma}
+\begin{proof}
+Write $A=W_w$, $B=W_{w-1}^*$, $N=N_w$, and $Q=\operatorname{diag}(A^*A,B^*B)$. Cauchy--Schwarz gives $[A\ B]^*[A\ B]\leq2Q$. By Lemma~\ref{lem:matrix-basic},
+\[
+ V_w\geq2^{-1/2}b_Q([A\ B]^*N[A\ B]).
+\]
+Diagonalize $Q$ within each of its two blocks. Discarding the nonnegative off-block summands of its cost leaves
+\[
+ b_Q([A\ B]^*N[A\ B])\geq b_{A^*A}(A^*NA)+b_{B^*B}(B^*NB).
+\]
+Finally $A^*A\leq S_{w+1}$ and $B^*B\leq S_{w-1}$. A second application of comparison, now with factor one, proves the result.
+\end{proof}
+
+Fix, for the rest of the analytic argument,
+\[
+ \lambda=11/10,\qquad \beta=1/10,\qquad q=21/20,\qquad \gamma=1/20,
+ \qquad c=3q=63/20.
+\]
+Thus $\lambda=1+\beta$, $q=1+\gamma$, and $0<\gamma<\beta$.
+For rates $\alpha$ that are a permutation of $(1,\lambda,\lambda)$ define
+\[
+ \overline J(s)=\int_\R g_{\beta s}(d)\sum_vJ_v(d,s)\dd d.
+\]
+A bar on a cost will denote the same integral over $d$ and $\Pi_d$. For example,
+\[
+ \overline V_v(s)=\int_\R g_{\beta s}(d)\int_{\Pi_d}V_v\dd\pi_d\dd d.
+\]
+
+\bpnode{H03}{A01--A02, H01--H02, F2--F3}{smeared_plane_dissipation}
+\begin{lemma}[Dissipation of the averaged plane energy]\label{lem:smeared}
+For fixed arrays and any permutation of the rates $(1,\lambda,\lambda)$,
+\[
+ -\overline J'(s)\geq c_*\sum_v\overline V_v(s),
+\]
+where we may take the rational constant $c_*=1/28$.
+\end{lemma}
+\begin{proof}
+Differentiate the extra Gaussian weight and use $2\partial_sg_{\beta s}=\beta\partial_d^2g_{\beta s}$. The domination in Lemma~\ref{lem:heat-id} justifies two integrations by parts in $d$. Since $\Sigma_\alpha+\beta=3\lambda$, the result is
+\[
+ 2\overline J'(s)
+ =\sum_v\left(3\lambda\overline Z_v-\alpha_v\overline V_v
+                  -\sum_{w\ne v}\alpha_w\overline Y_{v,w}\right).
+\]
+Use $2Z_v\leq Y_{v,v+1}+Y_{v,v-1}$. The two column costs with score at $w$ then have common coefficient $3\lambda/2-\alpha_w$, which is positive for both possible rates. Lemma~\ref{lem:neighbor} bounds their sum by $\sqrt2\overline V_w$. The coefficient of $\overline V_w$ is therefore at most
+\[
+ -\alpha_w+\sqrt2(3\lambda/2-\alpha_w).
+\]
+For $\alpha_w=1$ it is $-1+13\sqrt2/20$; for $\alpha_w=11/10$ it is $-11/10+11\sqrt2/20$. Since $\sqrt2\le10/7$ (square both sides to check $98\le100$), their negatives are at least $1/14$ and $11/35$, respectively. Both are at least $1/14$. Dividing by two proves the assertion with $c_*=1/28$. In particular, the variance of the added averaging Gaussian has been included in the dissipation calculation, rather than treated as a fixed parameter.
+\end{proof}
+
+\bpnode{H04}{M01, A02, F3--F4}{uniform_grid_initial_energy}
+\begin{lemma}[Uniform initial energy]\label{lem:initial}
+If $\sigma_v\geq h^2$ for all vertices, then for every $d$,
+\[
+ \int_{\Pi_d}\|W_v\|_{\HS}^3\dd\pi_d\leq M n_v^3,
+ \qquad M=1+\sqrt{2/\pi}.
+\]
+Consequently $\overline J(s)\leq2\sqrt2M\sum_v n_v^3$ whenever the rates are as above and $s\geq h^2$. The same upper bound holds if entries are replaced by entries of smaller absolute value.
+\end{lemma}
+\begin{proof}
+Comparing the two Gaussian tails with adjacent mesh intervals, leaving at most two nodes next to the center untreated, gives
+\[
+ \sum_i h g_\sigma(u_i-p)\leq1+2h\sup g_\sigma\leq M
+ \qquad(\sigma\geq h^2).
+\]
+Indeed, on the right of $p+h$ use the preceding mesh interval, and on the left of $p-h$ use the succeeding one; monotonicity gives the comparison and these intervals are disjoint. Weighted H\"older now gives
+\[
+ \|W_v\|_{\HS}^3
+ \leq M\sum_{i,j}|A_v(i,j)|^3w_v(i)w_{v+1}(j).
+\]
+Use $p_v,p_{v+1}$ as the two free coordinates on the plane. The integral of each of these two densities is $h$. This proves the first inequality. Sum the preceding bound for $e_v$ over $v$ and average in $d$ against a probability density. Entrywise domination follows from the same estimates, without asserting operator order for the Grams.
+\end{proof}
+
+\section{Output-dependent intervals and Gaussian derivatives}\label{sec:masks}
+\subsection{A maximal estimate on the integer line}
+We need only the following elementary maximal inequality. For a nonnegative sequence $a$ on $\Z$, set
+\[
+ M_{\Z}a(k)=\sup_{r\in\N\cup\{0\}}\frac1{2r+1}\sum_{|j-k|\leq r}a(j).
+\]
+\bpnode{D01}{A02, F0, F3}{integer_maximal_bounds}
+\begin{lemma}\label{lem:maximal}
+For $1<p<\infty$,
+\[
+ \sum_k|M_{\Z}a(k)|^p\leq C_p\sum_k|a(k)|^p.
+\]
+For $\tau\geq h^2$ and nonnegative $a$,
+\[
+ \sum_j h g_\tau(h(j-k))a(j)\leq C M_{\Z}a(k),
+\]
+where the second constant is absolute.
+\end{lemma}
+\begin{proof}
+For a finitely supported sequence, the set $\{M_{\Z}a>t\}$ is finite when $t>0$. Choose, for each of its points, a finite centered interval with average exceeding $t$. Select disjoint intervals greedily in decreasing order of length. Each discarded interval meets a selected interval at least as long as itself, and is contained in the threefold enlargement of that interval. Thus
+\[
+ |\{M_{\Z}a>t\}|\leq3\sum_{I\text{ selected}}|I|
+ \leq\frac3t\sum_j a(j).
+\]
+Truncation proves this weak estimate for arbitrary nonnegative sequences. Split $a$ into the parts where $a\leq t/2$ and $a>t/2$. The maximal function of the first part is at most $t/2$. Applying the weak estimate to the second gives
+\[
+ |\{M_{\Z}a>t\}|\leq\frac6t\sum_{a(j)>t/2}a(j).
+\]
+Multiply by $pt^{p-1}$, integrate in $t$, and use Tonelli. The right side becomes
+\[
+ 6p\sum_j a(j)\int_0^{2a(j)}t^{p-2}\dd t
+ =\frac{6p\,2^{p-1}}{p-1}\sum_j a(j)^p.
+\]
+This is the asserted strong estimate.
+
+For the Gaussian estimate write $R=\sqrt\tau/h\geq1$. The weights are bounded by $C R^{-1}\exp(-|j-k|^2/(2R^2))$. The portion $|j-k|\leq R$ is bounded by a constant times $M_{\Z}a(k)$. On $2^\ell R<|j-k|\leq2^{\ell+1}R$, use the upper bound $C R^{-1}e^{-2^{2\ell-1}}$ and the centered average over the larger interval. This gives at most $C2^\ell e^{-2^{2\ell-1}}M_{\Z}a(k)$. Sum the convergent numerical series.
+\end{proof}
+
+\subsection{Repeated changes of one edge}
+For every pair $(i,j)$ choose at most $n\geq1$ pairwise disjoint open scale intervals $(u_\ell,v_\ell)\subset(0,\infty)$ and complex coefficients $|\eta_\ell|\leq1$. The choices can depend on $(i,j)$. Define
+\[
+ A_0^s(i,j)=A_0(i,j)\sum_\ell\eta_\ell\one_{(u_\ell,v_\ell)}(s),
+\]
+and leave $A_1,A_2$ unchanged. Choose $0<s_-<s_+$ containing all endpoints in their interior and take $h^2\leq s_-$. There are finitely many switch scales. If $\Delta_\tau$ denotes the difference of one-sided values at a switch, then
+\[
+ |A_0^s(i,j)|\leq|A_0(i,j)|,\qquad
+ \sum_\tau|\Delta_\tau A_0(i,j)|\leq2n|A_0(i,j)|.
+\]
+These statements remain true at simultaneous openings and closings, by the triangle inequality.
+
+\bpnode{D02}{A02, M04, H03--H04, D01, F3}{repeated_mask_integrated_cost}
+\begin{lemma}[Integrated cost with repeated changes]\label{lem:mask}
+Evaluate the Gaussian energies on these arrays, at any permutation of the rates $(1,\lambda,\lambda)$, and average their center planes with $g_{\beta s}$. Then
+\[
+ \int_{s_-}^{s_+}\sum_v\overline V_v(s)\dd s
+ \leq C\left(\sum_v n_v^3+n\bigl(n_0^3+n_0^2(n_1+n_2)\bigr)\right).
+\]
+The constant is independent of the mesh, array dimensions, endpoint choices, and scale interval.
+\end{lemma}
+\begin{proof}
+Between switches the arrays are fixed, so Lemma~\ref{lem:smeared} applies. We bound all the jumps of its energy. At one switch, freeze the scale and weights, put $\delta A=\Delta_\tau A_0$, and interpolate the changed entries linearly. Their absolute values remain bounded by $|A_0|$. For the fixed pair $(i,j)$ put
+\[
+ X^2=\sum_m|A_0(i,m)|^2w_1(m),\qquad
+ Y^2=\sum_m|A_0(m,j)|^2w_0(m),
+\]
+\[
+ H^2=\sum_m|A_2(m,i)|^2w_2(m),\qquad
+ Q^2=\sum_m|A_1(j,m)|^2w_2(m).
+\]
+The letters denote nonnegative square roots. In $R_0=[W_0\ W_2^*]$, the changing entry has row norm at most $\sqrt{w_0(i)}(X+H)$ and column norm at most $\sqrt{w_1(j)}Y$. Its derivative has absolute value $\sqrt{w_0(i)w_1(j)}|\delta A(i,j)|$. In $R_1=[W_1\ W_0^*]$, use the changing adjoint entry; its corresponding row and column bounds are $\sqrt{w_1(j)}(Y+Q)$ and $\sqrt{w_0(i)}X$. The third row matrix does not change. Lemma~\ref{lem:entry}, summed over all changed entries, gives
+\[
+ |\Delta e_0|+|\Delta e_1|
+ \leq C\sum_{i,j}w_0(i)w_1(j)|\delta A(i,j)|(2XY+HY+QX).
+\]
+No constancy of rank during the interpolation is being assumed here.
+
+For this fixed pair $(i,j)$ the measure
+\[
+ h^{-2}w_0(i)w_1(j)g_{\beta s}(d)\dd\pi_d\dd d
+\]
+is a probability measure. Under it, $p_0,p_1,d$ are independent Gaussians with means $u_i,u_j,0$ and variances $\sigma_0,\sigma_1,\beta s$; $p_2=d-p_0-p_1$. Gaussian convolution gives
+\[
+ \mathbb E w_0(m)=h g_{2\sigma_0}(u_m-u_i),\qquad
+ \mathbb E w_1(m)=h g_{2\sigma_1}(u_m-u_j),
+\]
+\[
+ \mathbb E w_2(m)=h g_{\sigma_0+\sigma_1+\sigma_2+\beta s}(u_m+u_i+u_j).
+\]
+Extend the arrays by zero to $\Z^2$. Lemma~\ref{lem:maximal} bounds the expectations of $X^2,Y^2,H^2,Q^2$, respectively, by constant multiples of the following scale-independent quantities:
+\[
+ X_*^2(i,j)=M_{\Z}(|A_0(i,\cdot)|^2)(j),\qquad
+ Y_*^2(i,j)=M_{\Z}(|A_0(\cdot,j)|^2)(i),
+\]
+\[
+ H_*^2(i,j)=M_{\Z}(|A_2(\cdot,i)|^2)(-i-j),\qquad
+ Q_*^2(i,j)=M_{\Z}(|A_1(j,\cdot)|^2)(-i-j).
+\]
+All variances here are at least $h^2$, so the constants are uniform. The $L^{3/2}$ maximal estimate on each integer slice shows that the $L^3(\Z^2,h^2)$ norms of $X_*,Y_*,H_*,Q_*$ are at most $Cn_0,Cn_0,Cn_2,Cn_1$, respectively. For the last two, the changes $j\mapsto-i-j$ with $i$ fixed and $i\mapsto-i-j$ with $j$ fixed are bijections of $\Z$.
+
+Apply Cauchy--Schwarz under the probability measure to each product $XY$, $HY$, $QX$. Integrate the bound for the jump and sum over all switches. The bound on $\sum_\tau|\delta A(i,j)|$ then gives
+\[
+ \sum_\tau|\Delta_\tau\overline J|
+ \leq Cn\sum_{i,j}h^2|A_0(i,j)|(2X_*Y_*+H_*Y_*+Q_*X_*)
+ \leq Cn\bigl(n_0^3+n_0^2(n_1+n_2)\bigr),
+\]
+where the last step is H\"older on $\Z^2$.
+
+Finally integrate the strict dissipation inequality between consecutive switches. The energies telescope except for the jumps. Their total contribution is bounded by the sum of their absolute values. Discard the nonnegative final energy and bound the initial energy by Lemma~\ref{lem:initial}. Division by $c_*>0$ proves the lemma.
+\end{proof}
+
+\subsection{Placing a second derivative at one vertex}
+The next argument is the analytic change that supplies an even kernel.
+\bpnode{D03}{A02, M03, M05, D02, F3--F4}{Gaussian_derivative_grid_count}
+\begin{lemma}[Third and fourth derivative kernels]\label{lem:derivatives}
+For $m=3$ or $4$, set
+\[
+ \kappa_{m,s}(t)=s^{m/2}g_{cs}^{(m)}(t),\qquad
+ K^{(m)}_{u,v}(t)=\int_u^v\kappa_{m,s}(t)\,\frac{\dd s}{s}\quad(0<u<v).
+\]
+With the interval choices of the preceding subsection,
+\[
+ \left|h^3\sum_{i,j,k}A_0(i,j)A_1(j,k)A_2(k,i)
+       \sum_{\ell\text{ chosen at }(i,j)}\eta_\ell
+       K^{(m)}_{u_\ell,v_\ell}(u_i+u_j+u_k)\right|
+ \leq C\sqrt n\,n_0n_1n_2.
+\]
+\end{lemma}
+\begin{proof}
+Use the masked arrays $A_0^s,A_1,A_2$ and base variances $\lambda s$ at all three vertices. Choose $(d_0,d_1,d_2)=(1,1,1)$ when $m=3$ and $(2,1,1)$ when $m=4$. At vertex $v$, insert the real diagonal matrix
+\[
+ D_v(i)=\frac{s^{d_v/2}g_{qs}^{(d_v)}(u_i-p_v)}{g_{\lambda s}(u_i-p_v)}.
+\]
+Since $q<\lambda$, the Gaussian in the numerator has stronger decay. Scaling reduces this quotient to a fixed polynomial times a decaying Gaussian. Thus $\|D_v\|_{\op}\leq C$ uniformly in every parameter.
+
+We now bound the inserted cost at one vertex $v$. Keep its column weights at variance $\lambda s$, narrow its row variance to $s$, and shift its row center from $p_v$ to $p_v+d$. Denote the resulting Gram and score insertion by $T_v^d,U_v^d$. The latter uses the score $(u_i-p_v-d)/s$. The arrays, including their scale mask, do not depend on the center being shifted. The row-weight identity $g_s*g_{\beta s}=g_{\lambda s}$ gives
+\[
+ T_v^{\rm base}=\int_\R T_v^d g_{\beta s}(d)\dd d.
+\]
+For $j=1,2$, Gaussian convolution also gives
+\[
+ g_{qs}^{(j)}=g_s'*g_{\gamma s}^{(j-1)}.
+\]
+Since the row density multiplied by its score is $-h g_s'(u_i-p_v-d)$, define
+\[
+ a_{j,s}(d)=-s^{j/2}\frac{g_{\gamma s}^{(j-1)}(d)}{g_{\beta s}(d)}.
+\]
+The exact identity for the inserted Gram is
+\[
+ (R_v^{\rm base})^*D_vR_v^{\rm base}
+ =\int_\R a_{d_v,s}(d)U_v^d g_{\beta s}(d)\dd d.
+\]
+The minus sign in $a_{j,s}$ accounts for the distinction between a spatial derivative of the Gaussian and a derivative in its center. Because $\gamma<\beta$, scaling and Gaussian decay imply
+\[
+ |a_{j,s}(d)|\leq C\sqrt s,\qquad j=1,2.
+\]
+The Grams $T_v^d$ have the same support for all $d$: only positive row weights vary, while the column multipliers stay fixed. The integrability assumptions in Lemma~\ref{lem:convexity} hold, since the arrays are finite and all the densities and their derivatives are Gaussian. That lemma and quadratic homogeneity of the cost prove
+\[
+ b_{T_v^{\rm base}}\bigl((R_v^{\rm base})^*D_vR_v^{\rm base}\bigr)
+ \leq Cs\int_\R b_{T_v^d}(U_v^d)g_{\beta s}(d)\dd d.
+\]
+Integrating the base centers over $\Pi_0$ turns the shifted centers into $\Pi_d$, with unchanged plane measure. The right side is therefore $Cs\overline V_v(s)$ for the rates with value $1$ at $v$ and $\lambda$ at the other vertices. These are precisely the averaged costs controlled by Lemma~\ref{lem:mask}. There is one such application for each of the three vertices.
+
+Apply Lemma~\ref{lem:trace} to the base matrices and these $D_v$. Integrate in the base centers over $\Pi_0$ and then in $s$ over $[s_-,s_+]$ with measure $\dd s/s$. The right side is bounded by
+\[
+ C\left(\sum_v n_v^3+n\bigl(n_0^3+n_0^2(n_1+n_2)\bigr)\right).
+\]
+Indeed, the factor $s$ in the last cost estimate cancels $1/s$, and the three applications of Lemma~\ref{lem:mask} have the same bound. The absolute value of the integrated trace is no larger than the integral of its absolute value.
+
+For clarity, the integrated trace is exactly the expression in the statement. Its summand before center integration is
+\[
+ h^3 A_0^s(i,j)A_1(j,k)A_2(k,i)s^{m/2}
+ g_{qs}^{(d_0)}(u_i-p_0)g_{qs}^{(d_1)}(u_j-p_1)g_{qs}^{(d_2)}(u_k-p_2).
+\]
+On $\Pi_0$, convolution of these three factors is $g_{3qs}^{(m)}(u_i+u_j+u_k)$. Integrating in scale inserts the prescribed interval kernels. All integrals are absolutely convergent for the fixed finite arrays on this compact positive scale interval.
+
+We have proved a bound with the displayed cubic expression in the norms. If a norm is zero the asserted result is immediate. Otherwise apply that bound to arrays rescaled to have norms $n^{-1/2},1,1$. Its right side is bounded by an absolute constant, since $n(n^{-3/2}+2n^{-1})\leq3$. Rescaling the trilinear expression back gives $C\sqrt n\,n_0n_1n_2$.
+\end{proof}
+
+\section{Euclidean counting and a Cauchy criterion}\label{sec:count}
+Use the bilinear operator $B_K$ of Lemma~\ref{lem:L1-kernel}. For the kernels just constructed, Gaussian scaling and Tonelli give
+\[
+ \|K^{(m)}_{u,v}\|_1\le C_m\log(v/u)<\infty,\qquad 0<u<v.
+\]
+On a compact positive interval of endpoint choices these kernels vary continuously in $L^1$ and smoothly in the spatial variable, by Lemmas~\ref{lem:diff-integral} and \ref{lem:gaussian-calculus}. We write $C_c(\R^2)$ for the continuous complex functions of compact support.
+
+For $m\in\{3,4\}$ and an integer $n\geq1$, let
+\[
+ S^{(m)}_n(F,G)(x,y)=\sup_{\mathcal I}\sum_{(u,v)\in\mathcal I}
+                  |B_{K^{(m)}_{u,v}}(F,G)(x,y)|,
+\]
+where $\mathcal I$ ranges over lists of at most $n$ disjoint open intervals with positive rational endpoints. The supremum is countable, hence measurable.
+
+\bpnode{E01}{A03--A06, D03, F3--F4}{Euclidean_counting_bound}
+\begin{theorem}[Counting estimate]\label{thm:count}
+For $m=3,4$ and every $n\geq1$,
+\[
+ \|S^{(m)}_n(F,G)\|_{L^{3/2}(\R^2)}
+ \leq C\sqrt n\,\|F\|_{L^3(\R^2)}\|G\|_{L^3(\R^2)}.
+\]
+\end{theorem}
+\begin{proof}
+We first pass Lemma~\ref{lem:derivatives} to a continuous trilinear form. Let $G_0,G_1,G_2\in C_c(\R^2)$. At each pair $(a,b)$ make one choice from a fixed finite menu of lists of at most $n$ intervals and coefficients of modulus at most one. Initially suppose the choice is constant on a finite rectangular partition of a bounded region containing $\supp G_0$. Sample $G_v$ on mesh nodes to obtain the arrays in Lemma~\ref{lem:derivatives}. Choose the node range large enough to include the coordinate projections of their supports. Let $h\downarrow0$, keeping the finite menu and its endpoints fixed.
+
+The array norms converge to the corresponding $L^3$ norms. The triple sum converges to
+\[
+ \iiint_{\R^3}G_0(a,b)G_1(b,z)G_2(z,a)
+  \sum_{\ell\text{ chosen at }(a,b)}\eta_\ell
+  K^{(m)}_{u_\ell,v_\ell}(a+b+z)\dd a\dd b\dd z.
+\]
+The integrand is bounded and supported in a fixed compact box in all three coordinates: the compact supports of $G_0,G_1,G_2$ bound every coordinate. Every interval kernel is smooth, and the only additional discontinuities lie on finitely many coordinate hyperplanes from the rectangular partition in $(a,b)$. Lemma~\ref{lem:lattice-limit}, with $d=3$, proves convergence of the triple sums. The same lemma with $d=2$ proves convergence of the cubes of the array norms. The restriction $h^2\leq s_-$ holds for all sufficiently small meshes. We obtain the bound $C\sqrt n\prod_v\|G_v\|_3$ for this integral.
+
+This same bound holds for arbitrary measurable choices from the finite menu. Apply Lemma~\ref{lem:rect-menu} on a rectangle containing $\supp G_0$ to approximate those choices by rectangular choices that eventually agree almost everywhere. All triple integrands are bounded by one fixed constant times the indicator of a fixed compact box: the menu is finite and its kernels are bounded on the relevant compact range of $a+b+z$. The exceptional set in $(a,b)$ gives a null exceptional set in that box in three variables by Tonelli. Dominated convergence therefore passes the same inequality to arbitrary measurable choices from the finite menu.
+
+To put this in the displayed bilinear form, pair it with $H\in C_c(\R^2)$ and set
+\[
+ G_0(a,b)=H(-a,-b),\qquad G_1(b,z)=F(b+z,-b),\qquad G_2(z,a)=G(-a,z+a).
+\]
+These changes in two variables have Jacobian of absolute value one and preserve their $L^3$ norms. The change
+\[
+ x=-a,\qquad y=-b,\qquad t=a+b+z
+\]
+has absolute Jacobian one in three variables. The bound just proved therefore gives
+\[
+ \left|\iint H(x,y)\sum_\ell\eta_\ell(x,y)
+       B_{K^{(m)}_{u_\ell(x,y),v_\ell(x,y)}}(F,G)(x,y)\dd x\dd y\right|
+ \leq C\sqrt n\,\|H\|_3\|F\|_3\|G\|_3
+\]
+whenever the interval and coefficient choice is measurable and takes finitely many values.
+
+Now restrict the supremum defining $S_n^{(m)}$ to finitely many interval lists. At each point choose a maximizing list. Approximate the individual complex phases by a finite set of unit complex numbers with angular spacing at most $\delta$. The real part of the resulting sum is at least $\cos\delta$ times the sum of absolute values for the chosen list. All choices are measurable and take finitely many values. Apply the last estimate with nonnegative $H$, and let $\delta\downarrow0$. Lemma~\ref{lem:norm-test} gives the desired estimate for this finite supremum. Its $L^{3/2}$ membership is known before applying that lemma: each fixed output lies in $L^{3/2}$ by Lemma~\ref{lem:L1-kernel}, and a finite maximum of finite sums is bounded by the sum of all the absolute outputs occurring in it. Measurable choices can be implemented without a measurable argument function: form the finite list of all choices of an interval list and grid phases, evaluate their real parts, and take the least maximizing index. The finitely many comparison sets are measurable.
+
+Increase the finite collection to include all rational interval lists and use monotone convergence. This proves the theorem for continuous compactly supported $F,G$. Finally approximate arbitrary $L^3$ inputs by such continuous functions. For a fixed finite collection of kernels, the elementary bilinear bound above and the triangle inequality imply convergence of the associated finite supremum in $L^{3/2}$. Pass the estimate to the limit for every finite collection, and then increase the collection again. This proves the theorem in its stated generality.
+\end{proof}
+
+\bpnode{E02}{F0, F3}{square_root_counting_implies_ae_Cauchy}
+\begin{lemma}[Counting gives a limit]\label{lem:counting-limit}
+Let $(\Omega,\nu)$ be a probability space and let $H_\omega:(0,\infty)\to\C$ be continuous for every $\omega$. Assume $\omega\mapsto H_\omega(s)$ is measurable for every positive rational $s$. For $n\ge1$ let $S_n(\omega)$ be the supremum of
+\[
+ \sum_{(u,v)\in\mathcal I}|H_\omega(v)-H_\omega(u)|
+\]
+over lists of at most $n$ disjoint open intervals with positive rational endpoints. Suppose there is a finite $B$ with $\|S_n\|_{3/2}\le B\sqrt n$ for every $n\ge1$. Then $H_\omega(s)$ has a finite limit as $s\to\infty$ for almost every $\omega$.
+\end{lemma}
+\begin{proof}
+The interval lists are countable, so $S_n$ is measurable as a nonnegative extended-valued function. For $\varepsilon>0$ define the measurable set
+\[
+ E_\varepsilon=\bigcap_{K=1}^\infty\ 
+  \bigcup_{K<u<v;\ u,v\in\mathbb Q}
+   \{\omega:|H_\omega(v)-H_\omega(u)|>\varepsilon\}.
+\]
+At a point of $E_\varepsilon$, choose one such rational interval and then choose the next with its left endpoint larger than an integer exceeding the preceding right endpoint. Finite induction produces $n$ disjoint intervals with increments larger than $\varepsilon$. It follows that $S_n>n\varepsilon$ on $E_\varepsilon$. Markov's estimate gives
+\[
+ \nu(E_\varepsilon)\le\frac{\|S_n\|_{3/2}^{3/2}}{(n\varepsilon)^{3/2}}
+ \le B^{3/2}\varepsilon^{-3/2}n^{-3/4}.
+\]
+This holds for every $n$, so $\nu(E_\varepsilon)=0$. Remove the union of these null sets for $\varepsilon=1/j$, $j\ge1$. On the remaining set, for every $\varepsilon>0$ all sufficiently large rational pairs have difference at most $\varepsilon$. For two real parameters beyond that threshold, approximate each by rational parameters still beyond it and use continuity. Thus the same Cauchy property holds for all real parameters.
+
+The sequence $H_\omega(k)$ is Cauchy and therefore converges in $\C$. Given its limit and $\varepsilon>0$, choose the Cauchy threshold and then an integer beyond it whose value is within $\varepsilon$ of the limit. Comparison with that integer shows that every sufficiently large real parameter has value within $2\varepsilon$ of the same limit. This proves the full limit, not only sequential or rational convergence.
+\end{proof}
+
+\section{Transference to commuting real flows}\label{sec:flows}
+Let $(\Omega,\nu)$ be a probability space, and let $(U^t)_{t\in\R}$ and $(V^t)_{t\in\R}$ be commuting measure-preserving flows. We assume their actions are jointly measurable in time and the space variable. For bounded measurable $f,g$ and $K\in L^1(\R)$, set
+\[
+ B_K^{\Omega}(f,g)(\omega)=\int_\R f(U^t\omega)g(V^t\omega)K(t)\dd t.
+\]
+Let $S_n^{(m),\Omega}$ have the same definition as $S_n^{(m)}$, with these flow operators in place of the Euclidean operators.
+
+\bpnode{F01}{E01, A06, F3, F7}{flow_counting_transference}
+\begin{proposition}\label{prop:transfer}
+For bounded $f,g$, $m=3,4$, and $n\geq1$,
+\[
+ \|S_n^{(m),\Omega}(f,g)\|_{L^{3/2}(\nu)}
+ \leq C\sqrt n\,\|f\|_{L^3(\nu)}\|g\|_{L^3(\nu)}.
+\]
+\end{proposition}
+\begin{proof}
+First use only a finite family $\mathcal F$ of interval lists. Given $\varepsilon>0$, choose $L>0$ so that every interval kernel in this family has $L^1$ norm at most $\varepsilon$ outside $[-L,L]$. This is possible since the family is finite and its kernels are in $L^1$. Write $Q_M=[-M,M]^2$. For each $\omega$ define Euclidean functions
+\[
+ F_\omega(u,v)=f(U^uV^v\omega)\one_{Q_{M+L}}(u,v),\qquad
+ G_\omega(u,v)=g(U^uV^v\omega)\one_{Q_{M+L}}(u,v).
+\]
+For $(u,v)\in Q_M$ and $|t|\leq L$, commutation gives the exact identities of the integrands
+\[
+ F_\omega(u+t,v)=f(U^t(U^uV^v\omega)),\qquad
+ G_\omega(u,v+t)=g(V^t(U^uV^v\omega)).
+\]
+For other $t$, the Euclidean product is the same flow product multiplied by indicators taking values zero or one. Thus for each interval kernel the difference of the two outputs is bounded by $\varepsilon\|f\|_\infty\|g\|_\infty$. The difference of the finite counting expressions is at most $n$ times this quantity.
+
+Apply the triangle inequality in $L^{3/2}(\Omega\times Q_M)$ and the Euclidean counting estimate on every orbit. The flow expression at $(u,v)$ is evaluated at $U^uV^v\omega$, so invariance makes its norm equal to $|Q_M|^{2/3}$ times the flow norm on $\Omega$. For the Euclidean term, Cauchy--Schwarz in $\omega$ gives
+\[
+ \int_\Omega\|F_\omega\|_3^{3/2}\|G_\omega\|_3^{3/2}\dd\nu(\omega)
+ \leq |Q_{M+L}|\,\|f\|_3^{3/2}\|g\|_3^{3/2}.
+\]
+Indeed, the integral of $\|F_\omega\|_3^3$ is $|Q_{M+L}|\|f\|_3^3$, by Tonelli and invariance; the same holds for $G_\omega$. We have proved
+\[
+ \|S_{n,\mathcal F}^{(m),\Omega}(f,g)\|_{3/2}
+ \leq C\sqrt n\left(\frac{|Q_{M+L}|}{|Q_M|}\right)^{2/3}\|f\|_3\|g\|_3
+       +n\varepsilon\|f\|_\infty\|g\|_\infty.
+\]
+Let $M\to\infty$ with $L$ fixed, and then let $\varepsilon\downarrow0$. Increase $\mathcal F$ to exhaust all rational interval lists and use monotone convergence. This proves the stated counting estimate.
+\end{proof}
+
+\section{From Gaussian primitives to one-sided averages}\label{sec:tauberian}
+This section is a scalar argument; no ergodic theorem is used.
+\bpnode{S01}{A01--A02, F0, F3--F5}{Gaussian_primitives_to_all_L1_kernels}
+\begin{lemma}[Scalar implication]\label{lem:tauberian}
+Let $a:\R\to\mathbb C$ be bounded and measurable. For $m=3,4$ put
+\[
+ C_m(s)=\int_\R a(t)s^{m/2}g_{cs}^{(m)}(t)\dd t,
+ \qquad H_m(s)=\int_1^s C_m(u)\,\frac{\dd u}{u}.
+\]
+Suppose both $H_3(s)$ and $H_4(s)$ have finite limits as $s\to\infty$. There is a complex number $L$ such that, for every $\phi\in L^1(\R)$,
+\[
+ \lim_{R\to\infty}\int_\R a(t)\frac1R\phi(t/R)\dd t
+ =L\int_\R\phi(t)\dd t.
+\]
+In particular, $R^{-1}\int_0^R a(t)\dd t$ converges to $L$.
+\end{lemma}
+\begin{proof}
+All Gaussian kernels and their scale derivatives below have locally uniformly bounded $L^1$ norms. Boundedness of $a$ therefore justifies differentiation under their integrals and Fubini on compact positive scale intervals.
+
+\paragraph{The even kernels.}
+Put
+\[
+ \rho_s=g_{cs}-\frac{cs}{2}g_{cs}'',\qquad
+ P(s)=\int_\R a(t)\rho_s(t)\dd t,\qquad
+ A(s)=\int_\R a(t)g_{cs}(t)\dd t.
+\]
+The heat equation gives
+\[
+ \partial_s\rho_s=-\frac{c^2s}{4}g_{cs}^{(4)}
+                 =-\frac{c^2}{4s}\kappa_{4,s}.
+\]
+Hence $P(s)=P(1)-(c^2/4)H_4(s)$ has a finite limit, denoted by $L$. Also $P(s)=A(s)-sA'(s)$. The function $A$ is bounded by $\|a\|_\infty$, since the Gaussian has mass one. Integrating $(A(s)/s)'=-P(s)/s^2$ from $s$ to infinity gives the exact identity
+\[
+ A(s)=s\int_s^\infty P(u)\,\frac{\dd u}{u^2}.
+\]
+The weights on the right have mass one. Thus $A(s)\to L$, and in particular $|L|\leq\|a\|_\infty$.
+
+For the interpretation of the correction, integration by parts gives $\int t^2g_{cs}(t)\dd t=cs$, $\int g_{cs}''=0$, and $\int t^2g_{cs}''(t)\dd t=2$. Therefore $\int\rho_s=1$ and $\int t^2\rho_s(t)\dd t=0$. The cancellation of this second moment is what makes a fourth derivative sufficient.
+
+\paragraph{The odd kernels.}
+Define the bounded function
+\[
+ Q(s)=\int_\R a(t)\sqrt s\,g_{cs}'(t)\dd t.
+\]
+Its boundedness follows from Gaussian scaling. Differentiation gives
+\[
+ sQ'(s)=\frac12Q(s)+\frac c2C_3(s).
+\]
+Thus $(Q(s)/\sqrt s)'=(c/2)C_3(s)s^{-3/2}$. Since $Q$ is bounded and $C_3$ is bounded by scaling, integration to infinity is legitimate and yields
+\[
+ Q(s)=-\frac c2\sqrt s\int_s^\infty C_3(u)u^{-3/2}\dd u.
+\]
+Using $C_3(u)=uH_3'(u)$ and integrating by parts gives
+\[
+ Q(s)=\frac c2H_3(s)-\frac c4\sqrt s\int_s^\infty H_3(u)u^{-3/2}\dd u.
+\]
+The boundary term at infinity vanishes because $H_3$ has a finite limit. The measure
+\[
+ (\sqrt s/2)u^{-3/2}\one_{(s,\infty)}(u)\dd u
+\]
+has mass one. Both terms in the last expression consequently have the same limit and cancel. We conclude that $Q(s)\to0$. This deduction uses convergence of the primitive itself, not an unproved pointwise decay estimate for $C_3$.
+
+\paragraph{Density of the Gaussian kernels.}
+We give the approximation argument explicitly. The linear span of $e^{-\alpha t^2}$, $\alpha>0$, is dense in the even subspace of $L^1(\R)$. It suffices to approximate a continuous compactly supported function $h$ on $[0,\infty)$ and extend evenly. With $z=e^{-t^2}$, the function $h(t)/e^{-t^2}$ becomes a continuous function of $z\in(0,1]$ that is zero near $z=0$, so it extends continuously to $[0,1]$. By polynomial approximation on $[0,1]$, approximate it uniformly within $\delta$ by a polynomial $P(z)$. Then
+\[
+ \int_0^\infty|h(t)-e^{-t^2}P(e^{-t^2})|\dd t
+ \leq\delta\int_0^\infty e^{-t^2}\dd t.
+\]
+The approximant is a finite linear combination of $e^{-(k+1)t^2}$. To see the half-line density directly from F4, extend a given $L^1(0,\infty)$ function by zero to $\R$, approximate in $L^1(\R)$ by a continuous compactly supported function, and restrict that approximation to $[0,\infty)$. The restriction is continuous and compactly supported, and its error is no larger. This proves the asserted even density.
+
+Likewise the span of $t e^{-\alpha t^2}$, $\alpha>0$, is dense in the odd subspace. On the positive half-line first remove $(0,\delta)$ and $(R,\infty)$, whose $L^1$ contributions can be made arbitrarily small by integrability. Approximate the remaining function using F4, then multiply the approximation by a continuous cutoff equal to one on $[\delta,R]$ and supported in $(\delta/2,R+1)$. Since the target vanishes where the cutoff differs from one, multiplication does not increase its approximation error. This produces a continuous function supported in a compact subinterval of $(0,\infty)$. Divide this function by $te^{-t^2}$ and make the same substitution $z=e^{-t^2}$. The quotient extends continuously, with value zero, at both endpoints of $[0,1]$. Polynomial approximation and the error bound
+\[
+ \delta\int_0^\infty te^{-t^2}\dd t
+\]
+give a combination of $t e^{-(k+1)t^2}$. Extend it oddly. The same argument applies to complex functions by treating real and imaginary parts.
+
+Every $L^1$ function is the sum of its even and odd parts. Hence the Gaussian profiles $g_{c\alpha}$ and the odd profiles $\sqrt\alpha\,g_{c\alpha}'$, $\alpha>0$, together span a dense subspace of $L^1(\R)$. Their dilated pairings with $a$ are, respectively,
+\[
+ \int a(t)R^{-1}g_{c\alpha}(t/R)\dd t=A(\alpha R^2),
+\]
+\[
+ \int a(t)R^{-1}\sqrt\alpha\,g_{c\alpha}'(t/R)\dd t=Q(\alpha R^2).
+\]
+The first tends to $L$ and has kernel integral one; the second tends to zero and has kernel integral zero. Thus the desired limit holds on their linear span. For every $R$ the pairing has operator norm at most $\|a\|_\infty$ on $L^1$. The limiting functional $\phi\mapsto L\int\phi$ has norm $|L|\leq\|a\|_\infty$. Approximate an arbitrary $\phi$ by the dense span, bound the two approximation errors uniformly in $R$, and then let the approximation error tend to zero. This proves the assertion for all $\phi\in L^1$. Finally take $\phi=\one_{(0,1)}$.
+\end{proof}
+
+\Needspace{8\baselineskip}
+\bpnode{S02}{A02, E02, F01, S01, F3}{commuting_flow_averages_converge}
+\begin{theorem}[Convergence for commuting flows]\label{thm:flow}
+For the commuting jointly measurable probability-preserving flows of Section~\ref{sec:flows} and bounded measurable $f,g$, the averages
+\[
+ \frac1R\int_0^R f(U^t\omega)g(V^t\omega)\dd t
+\]
+converge to a finite limit for almost every $\omega$ as $R\to\infty$ through all positive real values.
+\end{theorem}
+\begin{proof}
+Choose representatives bounded everywhere. For $m=3,4$ define
+\[
+ H_{m,\omega}(s)=B_{\int_1^s\kappa_{m,u}\,\dd u/u}^{\Omega}(f,g)(\omega),\qquad s>0,
+\]
+where reversed limits have their usual negative sign. Gaussian scaling bounds $\|\kappa_{m,u}\|_1$ uniformly in $u$. On a compact positive scale interval, Fubini is therefore justified by $\|f\|_\infty\|g\|_\infty\int\|\kappa_{m,u}\|_1\dd u/u<\infty$. It gives the pointwise identity
+\[
+ H_{m,\omega}(s)=\int_1^s\int_\R f(U^t\omega)g(V^t\omega)\kappa_{m,u}(t)\dd t\,\frac{\dd u}{u}.
+\]
+The bound on the integrand shows that this primitive is continuous in $s$ for every $\omega$. Joint measurability gives measurability in $\omega$ for each rational $s$. Its increment on $(u,v)$ is exactly $B_{K^{(m)}_{u,v}}^{\Omega}(f,g)$. Proposition~\ref{prop:transfer} supplies the hypothesis of Lemma~\ref{lem:counting-limit}, with $B=C\|f\|_3\|g\|_3<\infty$. For each $m$ the primitive therefore has a finite limit almost everywhere. Intersect the two full-measure sets. For each remaining $\omega$, apply Lemma~\ref{lem:tauberian} to the bounded measurable function $a(t)=f(U^t\omega)g(V^t\omega)$. This proves convergence through all positive real $R$.
+\end{proof}
+
+\section{Discrete transformations and arbitrary probability spaces}\label{sec:discrete}
+
+\bpnode{T01}{F0, F3--F4, F7}{two_coordinate_suspension_flows}
+\begin{lemma}[Suspension flows]\label{lem:suspension-flows}
+Let $T,S$ be commuting invertible probability-preserving transformations of $(X,\mathcal B,\mu)$, with measurable inverses. On $\Omega=X\times[0,1)^2$ with product probability measure, the formulas
+\[
+ U^t(x,u,v)=\bigl(T^{\lfloor u+t\rfloor}x,\{u+t\},v\bigr),
+\]
+\[
+ V^t(x,u,v)=\bigl(S^{\lfloor v+t\rfloor}x,u,\{v+t\}\bigr)
+\]
+define commuting jointly measurable probability-preserving real flows. Here $\{a\}=a-\lfloor a\rfloor$, and negative powers use the given inverses.
+\end{lemma}
+\begin{proof}
+For real $a,b$,
+\[
+ \lfloor a\rfloor+\lfloor\{a\}+b\rfloor=\lfloor a+b\rfloor,
+ \qquad \{\{a\}+b\}=\{a+b\}.
+\]
+Both identities follow because the quantities being subtracted differ by the integer $\lfloor a\rfloor$, and the fractional part is in $[0,1)$. They prove the group law for each displayed family and the identity at time zero. Commutation of $T,S$ implies commutation of all their integer powers, including negative powers, by multiplying the original commutation identity by inverses. Each flow leaves the other's fractional coordinate unchanged. Substitution in the two compositions now proves $U^tV^s=V^sU^t$ for every $s,t$.
+
+For each integer $k$, the set of $(t,u)$ with $k\le u+t<k+1$ is Borel. On it the first formula uses the fixed measurable map $T^k$ and the continuous function $u+t-k$. A countable union of these pieces proves joint measurability; the proof for $V$ is identical. Inverse iterates preserve measure: if $T$ and $T^{-1}$ are measurable and $T$ preserves measure, apply invariance to $T^{-1}(E)$ or compose the two pushforward identities.
+
+To prove invariance of $U^t$, take a nonnegative measurable test function $H$ on the product and partition $[0,1)$ into
+\[
+ I_k=\{u\in[0,1):k\le u+t<k+1\}.
+\]
+For fixed $t$ only finitely many of these intervals are nonempty. On $I_k$ change variable $w=u+t-k$ and then use invariance of $\mu$ under $T^k$. Its contribution becomes
+\[
+ \int_{J_k}\int_X\int_0^1 H(x,w,v)\dd v\dd\mu(x)\dd w,
+ \qquad J_k=(I_k+t-k)\subset[0,1).
+\]
+The half-open intervals $J_k$ partition $[0,1)$, since rotation by $t$ modulo one is a bijection. Summing gives the integral of $H$ on the original product. Tonelli justifies every rearrangement. This proves preservation for positive and negative $t$; the second flow is treated with the $v$ coordinate instead.
+\end{proof}
+
+\bpnode{T02}{S02, T01, F3}{invertible_commuting_averages_ae}
+\begin{theorem}[Bounded inputs, invertible maps]\label{thm:invertible}
+For commuting invertible probability-preserving $T,S$ and bounded measurable complex $f,g$, the averages $A_N(f,g)$ converge almost everywhere.
+\end{theorem}
+\begin{proof}
+Use T01 and let $I=(1/4,1/2)$. Set
+\[
+ \widetilde f(x,u,v)=f(x)\one_I(u),\qquad
+ \widetilde g(x,u,v)=g(x)\one_I(v).
+\]
+For $0<u,v<1/8$ put
+\[
+ J(u,v)=(1/4-\min(u,v),\ 1/2-\max(u,v)),
+ \qquad b(u,v)=1/4-|u-v|>1/8.
+\]
+This interval lies in $(0,1)$ and has length $b(u,v)$. Write $t=n+r$ with integer $n\ge0$ and $0\le r<1$. If $\{u+r\}\in I$, then $u+r$ has not crossed one: otherwise its fractional part would be less than $u<1/8$, which is outside $I$. Thus $u+r\in I$ and $\lfloor u+t\rfloor=n$. The same argument holds for $v$. Consequently the two auxiliary indicators are nonzero exactly for $r\in J(u,v)$, and their product of function values then equals $f(T^nx)g(S^nx)$. Integration on the $N$ unit intervals gives the exact identity
+\[
+ \frac1N\int_0^N\widetilde f(U^t(x,u,v))\widetilde g(V^t(x,u,v))\dd t
+ =b(u,v)A_N(f,g)(x),\qquad 0<u,v<1/8.
+\]
+S02 gives convergence of the left side almost everywhere on the suspension. The convergence event along integers is measurable, as can be written by the countable Cauchy criterion. By Fubini, for almost every $x$ it occurs for almost every $(u,v)$ in this square of positive measure. At least one such pair exists for each of those $x$, and its coefficient $b(u,v)$ is positive. Dividing by that fixed coefficient proves convergence of $A_N(f,g)(x)$. No approximation or error term is used in this transfer.
+\end{proof}
+
+\bpnode{T03}{F0, F6--F7}{bounded_observable_compact_coding}
+\begin{lemma}[Compact coding of the two observables]\label{lem:coding}
+For commuting measure-preserving maps $T,S$ on an arbitrary probability space and bounded measurable $f,g$, there are a compact metric space $E$, a Borel probability measure $\nu$, commuting continuous $\nu$-preserving maps $\tau,\sigma$, bounded continuous functions $f_E,g_E$ on $E$, and a measure-preserving measurable map $\pi:X\to E$ such that
+\[
+ \pi T=\tau\pi,\qquad \pi S=\sigma\pi,\qquad
+ f=f_E\pi,\qquad g=g_E\pi.
+\]
+\end{lemma}
+\begin{proof}
+Choose a closed disk $D\subset\C$ containing both ranges and set $E=(D\times D)^{\N_0^2}$. This is compact metrizable by F6. At coordinate $(m,n)$ define
+\[
+ \pi(x)_{m,n}=\bigl(f(T^mS^n x),g(T^mS^n x)\bigr).
+\]
+The map is measurable because its countably many coordinates are measurable and generate the Borel sigma algebra. Take $\nu=\pi_*\mu$. Let $\tau$ shift coordinates by $(m,n)\mapsto(m+1,n)$ and $\sigma$ by $(m,n)\mapsto(m,n+1)$. Coordinatewise inspection proves that these are commuting continuous maps and that the two intertwining identities hold. Pushing forward the invariance identities for $T,S$ proves invariance of $\nu$. The first and second components at coordinate $(0,0)$ are the required continuous functions. Their pullbacks are exactly $f,g$.
+\end{proof}
+
+\bpnode{T04}{A07, F0, F3, F6--F7}{commuting_compact_natural_extension}
+\begin{lemma}[An invertible extension constructed explicitly]\label{lem:natural-extension}
+Let $E$ be a compact metric space with Borel probability measure $\nu$ and commuting continuous measure-preserving maps $\tau,\sigma$. There are a compact metric probability space $(\widehat E,\widehat\nu)$, commuting measure-preserving homeomorphisms $\widehat\tau,\widehat\sigma$, and a continuous measure-preserving map $\pi_0:\widehat E\to E$ intertwining both maps.
+\end{lemma}
+\begin{proof}
+Put $R=\tau\sigma$. On the first $k+1$ coordinates of $E^{\N_0}$ prescribe the law of
+\[
+ (R^kz,R^{k-1}z,\ldots,z),\qquad z\sim\nu.
+\]
+Dropping its final coordinate replaces $z$ by $Rz$, which has the same law, so these finite-coordinate laws are consistent. Define a functional on real continuous cylinder functions by integration against the relevant law. Every such function can be expressed using an initial coordinate block. If two expressions have different block lengths, enlarge to the larger length and use consistency; hence the functional is well-defined. It is positive, takes value one at the constant one, and has absolute value at most the uniform norm.
+
+For completeness, cylinder functions are uniformly dense in $C(E^{\N_0},\R)$. The probability measure ensures that $E$ is nonempty, so fix $z_*\in E$. Use a bounded metric $d_E\le1$ on $E$ and the product metric
+\[
+ d(x,y)=\sum_{j=0}^\infty2^{-j-1}d_E(x_j,y_j).
+\]
+Freezing coordinates after $k$ to $z_*$ changes this distance by at most $2^{-k-1}$. Uniform continuity of a continuous function on the compact product therefore gives uniform approximation by the resulting cylinder functions. Extend the functional continuously. It remains positive: an approximation to a nonnegative function within $\varepsilon$ is bounded below by $-\varepsilon$, so its functional is at least $-\varepsilon$; take a limit. Apply F6, in its real form, to obtain a Borel probability measure with these integrals. Each prescribed finite-coordinate law and each actual finite-coordinate marginal is a Borel probability measure on a compact metric space. Their integrals of continuous functions agree by construction, so A07 identifies these measures. Thus the constructed measure has exactly the prescribed laws.
+
+For every $k\ge0$, the event $R x_{-k-1}=x_{-k}$ has measure one by the law of the first $k+2$ coordinates. Intersecting these countably many closed events gives a closed full-measure subspace
+\[
+ \widehat E=\{(x_0,x_{-1},\ldots):Rx_{-k-1}=x_{-k}\text{ for all }k\ge0\}.
+\]
+Restrict the measure to this compact subspace, and call it $\widehat\nu$. Define
+\[
+ \widehat R(x_0,x_{-1},\ldots)=(Rx_0,x_0,x_{-1},\ldots).
+\]
+Its inverse drops the first coordinate; the defining relations prove both inverse identities. Both maps are continuous. Apply $\tau$ and $\sigma$ coordinatewise to define $\widehat\tau$ and $\widehat\sigma$. Commutation with $R$ shows that these maps preserve $\widehat E$; they are continuous and commute.
+
+They preserve the measure. For example, the first $k+1$ coordinates after applying $\widehat\tau$ have the law of $(R^k\tau z,\ldots,\tau z)$, the same law as before by $\tau$-invariance. Equality on all finite cylinders implies equality of the measures by F6. The same proof applies to $\widehat\sigma$. Their product equals the coordinatewise application of $R$, which equals $\widehat R$ on $\widehat E$. Since they commute and their product is invertible, each is invertible; explicitly,
+\[
+ \widehat\tau^{-1}=\widehat\sigma\widehat R^{-1},\qquad
+ \widehat\sigma^{-1}=\widehat\tau\widehat R^{-1}.
+\]
+For instance, multiplying the first formula on the left by $\widehat\tau$ gives the identity. Multiplying on the right also does, since $\widehat\tau$ commutes with $\widehat R$ and hence with its inverse. The inverses are continuous. Projection to $x_0$ has law $\nu$ by the prescribed law for $k=0$, is continuous, and intertwines the coordinatewise lifts with $\tau,\sigma$. This proves every assertion.
+\end{proof}
+
+\bpnode{T05}{T02--T04, F3, F7}{bounded_commuting_averages_ae_and_norm}
+\begin{theorem}[Bounded inputs on arbitrary probability spaces]\label{thm:bounded}
+Let $T,S$ be commuting measurable measure-preserving maps on an arbitrary probability space. For bounded measurable complex $f,g$, the averages $A_N(f,g)$ converge almost everywhere, and in $L^r$ for every $1\le r<\infty$.
+\end{theorem}
+\begin{proof}
+Apply T03 to obtain the compact coded system. Apply T04 to lift it to an invertible system, and then apply T02 to the lifted coordinate functions. Their averages are the pullbacks, under $\pi_0$, of the averages on $E$. The set where the latter sequence fails to converge is measurable by the countable Cauchy criterion. If it had positive measure, its inverse image under the measure-preserving map $\pi_0$ would have the same positive measure, contradicting convergence upstairs. Thus the averages converge almost everywhere on $E$. Pulling back by the coding map gives the assertion on $X$.
+
+Every average is bounded by $\|f\|_\infty\|g\|_\infty$, and so is its almost-everywhere limit. Define the limit to be zero on the null exceptional set; it is measurable, for example as the pointwise limit of the measurable sequence on the measurable convergence set. Dominated convergence applied to the $r$th power of the difference gives convergence in each finite $L^r$.
+
+The assertion also holds when the two maps commute only almost everywhere. Let $B$ be a measurable null set outside which they commute, and let $\mathcal W$ be the countable set of finite words in $T,S$, including the empty word. Remove $\bigcup_{w\in\mathcal W}w^{-1}B$. The remaining measurable set has full measure, is forward-invariant under both maps, and the restricted maps commute exactly. Their restrictions preserve the restricted probability measure: for a measurable subset of that set, its full preimage and its restricted preimage differ only on the discarded null set. Apply the exact assertion there. The same countable-null-set argument handles the replacement of essentially bounded inputs by bounded representatives.
+\end{proof}
+
+\section{Extension to integrable functions}\label{sec:extension}
+For a measure-preserving map $T$, define the one-sided ergodic maximal function of a nonnegative $h$ by
+\[
+ M_T h(x)=\sup_{N\geq1}\frac1N\sum_{n=0}^{N-1}h(T^nx).
+\]
+\bpnode{T06}{D01, F3, F7}{one_sided_ergodic_weak_maximal}
+\begin{lemma}[Weak maximal estimate]\label{lem:ergodic-max}
+For $h\in L^1(\mu)$, $h\geq0$, and $t>0$,
+\[
+ \mu\{M_T h>t\}\leq\frac{6\|h\|_1}{t}.
+\]
+No invertibility or commutation assumption is needed.
+\end{lemma}
+\begin{proof}
+The one-sided maximal function of a sequence is at most twice its centered maximal function: a forward interval of length $N$ is contained in the centered interval of length $2N-1$. Thus the proof of Lemma~\ref{lem:maximal} gives a weak bound with constant six for the one-sided sequence maximal function.
+
+Fix positive integers $K,L$. For each $x$ form the finite sequence $h(T^j x)$ for $0\leq j<L+K$, extended by zero outside this range. At every starting index $0\leq j<L$, its averages of lengths at most $K$ are the corresponding orbit averages at $T^j x$. Apply the sequence weak bound and integrate in $x$. Invariance gives
+\[
+ L\,\mu\left\{\max_{1\leq N\leq K}\frac1N\sum_{n=0}^{N-1}h(T^nx)>t\right\}
+ \leq\frac{6(L+K)\|h\|_1}{t}.
+\]
+Divide by $L$, let $L\to\infty$, and then let $K\to\infty$. Monotone convergence of the increasing level sets proves the lemma.
+\end{proof}
+
+\bpnode{T07}{T06, F3, F7}{bilinear_ergodic_weak_maximal}
+\begin{lemma}[A bilinear weak bound]\label{lem:bilinear-max}
+Let $1\leq p,q\leq\infty$, $1/p+1/q\leq1$, and $1/r=1/p+1/q>0$. For $f\in L^p$, $g\in L^q$,
+\[
+ \mu\left\{\sup_{N\geq1}|A_N(f,g)|>t\right\}
+ \leq C\left(\frac{\|f\|_p\|g\|_q}{t}\right)^r.
+\]
+\end{lemma}
+\begin{proof}
+First let $p,q$ be finite. H\"older on the normalized finite counting measure, with an additional factor equal to one if $1/p+1/q<1$, gives
+\[
+ \sup_N|A_N(f,g)|
+ \leq(M_T|f|^p)^{1/p}(M_S|g|^q)^{1/q}.
+\]
+For $a>0$, the event that this product exceeds $t$ is contained in the union of the events that its first factor exceeds $a$ and that its second exceeds $t/a$. Lemma~\ref{lem:ergodic-max} bounds its measure by
+\[
+ 6\|f\|_p^p a^{-p}+6\|g\|_q^q a^q t^{-q}.
+\]
+If both norms are positive, take
+$a=(\|f\|_p^p t^q/\|g\|_q^q)^{1/(p+q)}$.
+Both summands then equal $6(\|f\|_p\|g\|_q/t)^r$, where $r=pq/(p+q)$. If either norm vanishes, the averages vanish almost everywhere, by invariance and a countable union of null sets. If one exponent is infinity, bound its factor by the corresponding essential supremum and apply Lemma~\ref{lem:ergodic-max} to the other factor. This proves every stated case.
+\end{proof}
+
+\bpnode{T08}{T05, T07, F0, F3, F7}{commuting_ergodic_averages_converge}
+\begin{theorem}[Final convergence theorem]\label{thm:main}
+Let $T,S$ be commuting measurable probability-preserving transformations on an arbitrary probability space. For every $f\in L^p$, $g\in L^q$, where $1\le p,q\le\infty$ and $1/p+1/q\le1$, the averages
+\[
+ \frac1N\sum_{n=0}^{N-1}f(T^nx)g(S^nx)
+\]
+converge to a finite limit almost everywhere. If $1/r=1/p+1/q>0$, convergence also holds in $L^r$. For $p=q=\infty$, convergence holds in every finite $L^r$. Neither ergodicity nor invertibility is assumed.
+\end{theorem}
+\begin{proof}
+The bounded-input assertion has been proved in Theorem~\ref{thm:bounded}. It remains to treat possibly unbounded inputs. If an exponent is finite, truncate its input by $f_k=f\one_{\{|f|\leq k\}}$ or $g_k=g\one_{\{|g|\leq k\}}$. For an infinite exponent leave the already bounded input unchanged. The truncated inputs are bounded, their norms do not exceed the original norms, and they converge in the finite-exponent input spaces. On a common full-measure set all their averages converge.
+
+Let the Cauchy oscillation of the original averages be
+\[
+ \mathcal O(x)=\lim_{M\to\infty}\sup_{N,N'\geq M}|A_N(f,g)(x)-A_{N'}(f,g)(x)|.
+\]
+Bilinearity and convergence for the bounded pair give, for every $k$, almost everywhere,
+\[
+ \mathcal O\leq2\sup_N|A_N(f-f_k,g)|+2\sup_N|A_N(f_k,g-g_k)|.
+\]
+Lemma~\ref{lem:bilinear-max} implies that the measure of $\{\mathcal O>\varepsilon\}$ tends to zero as $k\to\infty$, for every fixed $\varepsilon>0$. Hence $\mathcal O=0$ almost everywhere. All individual averages are finite almost everywhere, so they form a Cauchy sequence in $\mathbb C$ there and have a finite limit.
+
+For norm convergence, H\"older, invariance, and the triangle inequality give, for every $N$,
+\[
+ \|A_N(f,g)\|_r\leq\|f\|_p\|g\|_q.
+\]
+Here $r\geq1$ by the hypothesis. It follows that, uniformly in $N$,
+\[
+ \|A_N(f,g)-A_N(f_k,g_k)\|_r
+ \leq\|f-f_k\|_p\|g\|_q+\|f_k\|_p\|g-g_k\|_q,
+\]
+with the zero error understood in an unchanged infinite-exponent input. The right side tends to zero. For fixed $k$, the bounded averages converge in $L^r$. The original averages are therefore Cauchy in $L^r$ and converge there by completeness. Their norm limit equals their almost-everywhere limit, as follows directly from Fatou's lemma: if $A$ is the almost-everywhere limit, then for every $N$,
+\[
+ \|A_N-A\|_r^r\le\liminf_{M\to\infty}\|A_N-A_M\|_r^r.
+\]
+The Cauchy property makes this tend to zero as $N\to\infty$, so the two limits agree in $L^r$ and almost everywhere. The case $p=q=\infty$ was already proved separately by dominated convergence in each finite $L^r$. This completes the theorem.
+\end{proof}
+
+
+\clearpage
+\appendix
+\section{Dependency index and implementation obligations}\label{sec:implementation}
+The table below indexes proofs already supplied above. Its order is the order of the document, and each nonlibrary dependency occurs earlier. The eight foundation interfaces F0--F7 are declared in Section~\ref{sec:library}; they are not additional research assumptions. Proposed declaration names occur beside the corresponding proofs.
+
+\begingroup\small
+\setlength{\tabcolsep}{4pt}
+\begin{longtable}{@{}p{0.47in}p{2.86in}p{2.78in}@{}}
+\toprule
+Node & Mathematical content & Direct dependencies\\
+\midrule\endfirsthead
+\toprule
+Node & Mathematical content & Direct dependencies\\
+\midrule\endhead
+\bottomrule\endfoot
+A01 & Differentiation under an integral & F0--F3\\
+A02 & Gaussian identities and domination & A01, F0--F5\\
+A03 & Finite measurable menu approximation & F0, F3--F4\\
+A04 & Lattice sampling by dominated convergence & F0, F3--F4\\
+A05 & Nonnegative norming tests & F0, F3--F4\\
+A06 & Integrable-kernel bilinear estimate & F0, F3--F4\\
+A07 & Compact Borel measure uniqueness & F0, F3, F6\\
+M01 & Gram spectra and supported Lyapunov inverse & F0--F1\\
+M02 & Hessian, order comparison, insertion estimate & M01, F0--F3\\
+M03 & Joint averaging of the matrix cost & M01--M02, F3\\
+M04 & Energy changes through rank changes & M01--M02, F2--F3\\
+M05 & Cyclic trace estimate with complex phases & M01--M02, F0\\
+H01 & Heat identities and plane differentiations & A01--A02, M01--M02, F3--F4\\
+H02 & Neighboring row-cost comparison & M01--M02, H01\\
+H03 & Averaged-plane strict dissipation & A01--A02, H01--H02, F2--F3\\
+H04 & Uniform initial grid energy & M01, A02, F3--F4\\
+D01 & Discrete weak and strong maximal estimates & A02, F0, F3\\
+D02 & Integrated cost with repeated masks & A02, M04, H03--H04, D01, F3\\
+D03 & Third- and fourth-derivative grid estimates & A02, M03, M05, D02, F3--F4\\
+E01 & Euclidean square-root counting estimate & A03--A06, D03, F3--F4\\
+E02 & Counting implies almost-everywhere Cauchy & F0, F3\\
+F01 & Counting estimate for commuting flows & E01, A06, F3, F7\\
+S01 & Scalar recovery of all integrable kernels & A01--A02, F0, F3--F5\\
+S02 & Convergence for commuting real flows & A02, E02, F01, S01, F3\\
+T01 & Explicit two-coordinate suspension & F0, F3--F4, F7\\
+T02 & Bounded convergence for invertible maps & S02, T01, F3\\
+T03 & Compact coding of bounded observables & F0, F6--F7\\
+T04 & Explicit simultaneous invertible extension & A07, F0, F3, F6--F7\\
+T05 & Bounded convergence on arbitrary spaces & T02--T04, F3, F7\\
+T06 & One-sided ergodic weak maximal estimate & D01, F3, F7\\
+T07 & Bilinear weak maximal estimate & T06, F3, F7\\
+T08 & Final almost-everywhere and norm convergence & T05, T07, F0, F3, F7\\
+\end{longtable}
+\endgroup
+
+\subsection{Representations that preserve the mathematical hypotheses}
+\paragraph{Finite matrices.}
+Use finite index types for every row and column space. A support is the orthogonal complement of the kernel, not a choice of a strictly positive regularization. The cost is a real quadratic form on the Hermitian operators on that support. M02 uses a positive regularization only to prove an order comparison and takes its limit with the support condition in force. M03 averages on a single fixed support. H01 allows the support to move when all centers move, but its partial differentiation formulas hold on the fixed support of the selected Gram. The factorization in its proof is the justification for smoothness with moving support.
+
+\paragraph{Uniform constants.}
+In D03 and E01, quantify the numerical constant before the mesh, node range, arrays, number of intervals, interval endpoints, and measurable selector. Fix $\lambda=11/10$, $\beta=1/10$, $\gamma=1/20$, $q=21/20$, and $c=63/20$ globally. The dissipation constant can be the exact rational $1/28$. An estimate for a fixed mesh with a dimension-dependent constant would not establish E01. Likewise the $n_0^2(n_1+n_2)$ factor in D02 must not be replaced by a term linear in $n_0$; D03 uses precisely that quadratic dependence when normalizing.
+
+\paragraph{Integrals.}
+Use nonnegative extended integrals for suprema, level sets, and Tonelli steps. Use real or complex Bochner integrals only after supplying integrability. In particular, the existence of an expression for a totalized integral is not a proof of absolute integrability. A01, A02, A06, H01, and the bounded-input hypotheses provide the integrability witnesses actually used. For endpoint kernels, keep the restriction $0<u<v<\infty$ in the definition until the countable supremum is taken.
+
+\paragraph{Measurability and almost-everywhere representatives.}
+Define $S_n$ as a supremum over a countable type of finite rational interval lists. It initially has values in $[0,\infty]$; its finite $L^{3/2}$ estimate then proves finiteness almost everywhere. E01 first proves estimates for finite maxima, so it does not assume that an infinite supremum has a maximizing list. Grid phases are a finite set, with the least maximizing index used to make the selector measurable. In F01 and S02 all flow actions are jointly measurable and the bounded representatives are fixed before forming their time integrals.
+
+\paragraph{Probability spaces.}
+The suspension T01 uses actual invertible measurable maps. T03--T04 construct that situation from an arbitrary probability space rather than assuming the latter is standard Borel. Compact coding records only the countably many values of the two observables needed in the proof. A07 supplies the uniqueness of finite-coordinate laws without an unstated regularity hypothesis. The null-set pullbacks in T05 use measure preservation, not surjectivity of a coding map. For almost-everywhere commuting maps, restrict first to the invariant full-measure set constructed there.
+
+\subsection{Scope of the certificate to be produced in Lean}
+The mathematical proof obligations for all nodes are supplied in this document. To turn this blueprint into a formal proof, each node must become an implemented theorem whose explicit arguments include the hypotheses in its statement and in the definitions of its section. The foundations are to be discharged by existing library theorems or their elementary wrappers, not declared as new axioms. Once implemented, the final theorem must depend only on those proved nodes and the library.
+
+No Lean source has been compiled for this document, no theorem environment has been kernel-checked here, and no Lean or mathlib commit has been pinned. The documentation references below were inspected on October 8, 2026. They identify the mathematical library interfaces, not a tested import file. In particular, the proposed declaration identifiers beside the proofs are names for work to implement, not quotations of existing declarations.
+
+The final certificate must not import a triangular Hilbert transform estimate, a variation inequality, a pointwise ergodic theorem for these averages, or a natural-extension theorem as an assumption. The only use of the repository in this document is attribution of the matrix, heat, and repeated-mask methods, whose proofs are included in M01--D03.
+
+\clearpage
+\begin{thebibliography}{99}
+\addcontentsline{toc}{section}{References}
+\bibitem{repo}
+OpenAI Mathematics repository. \emph{Annular variation of the triangular Hilbert transform at the symmetric point}, October 5, 2026. Source sections
+\href{https://raw.githubusercontent.com/openai/math/main/preprints/Annular-variation-of-the-triangular-Hilbert-transform-at-the-symmetric-point-October-5-2026/build/sections/matrix.tex}{\texttt{matrix.\allowbreak tex}},
+\href{https://raw.githubusercontent.com/openai/math/main/preprints/Annular-variation-of-the-triangular-Hilbert-transform-at-the-symmetric-point-October-5-2026/build/sections/heat.tex}{\texttt{heat.\allowbreak tex}}, and
+\href{https://raw.githubusercontent.com/openai/math/main/preprints/Annular-variation-of-the-triangular-Hilbert-transform-at-the-symmetric-point-October-5-2026/build/sections/smooth.tex}{\texttt{smooth.\allowbreak tex}}.
+This reference is attribution, not an imported theorem.
+
+\bibitem{ml-spectrum}
+The mathlib community. \emph{Mathlib.Analysis.Matrix.Spectrum}.
+\href{https://leanprover-community.github.io/mathlib4_docs/Mathlib/Analysis/Matrix/Spectrum.html}{Official module documentation}.
+The finite-dimensional Hermitian spectral theorem, orthonormal eigenvector bases, and the trace--eigenvalue identity.
+
+\bibitem{ml-ift}
+The mathlib community. \emph{Mathlib.Analysis.Calculus.InverseFunctionTheorem.FDeriv} and \emph{ContDiff}.
+\href{https://leanprover-community.github.io/mathlib4_docs/Mathlib/Analysis/Calculus/InverseFunctionTheorem/FDeriv.html}{Strict-derivative documentation};
+\href{https://leanprover-community.github.io/mathlib4_docs/Mathlib/Analysis/Calculus/InverseFunctionTheorem/ContDiff.html}{smooth-inverse documentation}.
+In particular \texttt{ContDiffAt.\allowbreak localInverse} and \texttt{ContDiffAt.\allowbreak to\_\allowbreak localInverse}.
+
+\bibitem{ml-prod}
+The mathlib community. \emph{Mathlib.MeasureTheory.Integral.Prod} and \emph{Mathlib.MeasureTheory.Measure.Prod}.
+\href{https://leanprover-community.github.io/mathlib4_docs/Mathlib/MeasureTheory/Integral/Prod.html}{Bochner--Fubini documentation};
+\href{https://leanprover-community.github.io/mathlib4_docs/Mathlib/MeasureTheory/Measure/Prod.html}{product-measure and Tonelli documentation}.
+Includes \texttt{MeasureTheory.\allowbreak integral\_\allowbreak prod} and the corresponding product-integrability criteria.
+
+\bibitem{ml-dct}
+The mathlib community. \emph{Mathlib.MeasureTheory.Integral.DominatedConvergence} and \emph{Mathlib.MeasureTheory.Integral.Bochner.Basic}.
+\href{https://leanprover-community.github.io/mathlib4_docs/Mathlib/MeasureTheory/Integral/DominatedConvergence.html}{Dominated-convergence documentation};
+\href{https://leanprover-community.github.io/mathlib4_docs/Mathlib/MeasureTheory/Integral/Bochner/Basic.html}{basic integration documentation}.
+In particular \texttt{MeasureTheory.\allowbreak tendsto\_\allowbreak integral\_\allowbreak of\_\allowbreak dominated\_\allowbreak convergence}.
+
+\bibitem{ml-lp}
+The mathlib community. \emph{Mathlib.MeasureTheory.Function.LpSpace.Basic} and \emph{Complete}.
+\href{https://leanprover-community.github.io/mathlib4_docs/Mathlib/MeasureTheory/Function/LpSpace/Basic.html}{Basic $L^p$ documentation};
+\href{https://leanprover-community.github.io/mathlib4_docs/Mathlib/MeasureTheory/Function/LpSpace/Complete.html}{completeness documentation}.
+
+\bibitem{ml-mean}
+The mathlib community. \emph{Mathlib.MeasureTheory.Integral.MeanInequalities}.
+\href{https://leanprover-community.github.io/mathlib4_docs/Mathlib/MeasureTheory/Integral/MeanInequalities.html}{Official module documentation}.
+H\"older and Minkowski inequalities, including
+\texttt{ENNReal.\allowbreak lintegral\_\allowbreak Lp\_\allowbreak mul\_\allowbreak le\_\allowbreak Lq\_\allowbreak mul\_\allowbreak Lr} and
+\texttt{ENNReal.\allowbreak lintegral\_\allowbreak Lp\_\allowbreak add\_\allowbreak le}.
+
+\bibitem{ml-haar}
+The mathlib community. \emph{Mathlib.MeasureTheory.Measure.Lebesgue.EqHaar}.
+\href{https://leanprover-community.github.io/mathlib4_docs/Mathlib/MeasureTheory/Measure/Lebesgue/EqHaar.html}{Official module documentation}.
+Determinant scaling of Lebesgue measure under invertible linear maps.
+
+\bibitem{ml-regular}
+The mathlib community. \emph{Mathlib.MeasureTheory.Measure.Regular}.
+\href{https://leanprover-community.github.io/mathlib4_docs/Mathlib/MeasureTheory/Measure/Regular.html}{Official module documentation}.
+Regularity and approximation of finite-measure measurable sets by open sets.
+
+\bibitem{ml-density}
+The mathlib community. \emph{Mathlib.MeasureTheory.Function.ContinuousMapDense}.
+\href{https://leanprover-community.github.io/mathlib4_docs/Mathlib/MeasureTheory/Function/ContinuousMapDense.html}{Official module documentation}.
+In particular \texttt{MeasureTheory.\allowbreak MemLp.\allowbreak exists\_\allowbreak hasCompactSupport\_\allowbreak eLpNorm\_\allowbreak sub\_\allowbreak le}.
+
+\bibitem{ml-gaussian}
+The mathlib community. \emph{Mathlib.Analysis.SpecialFunctions.Gaussian.GaussianIntegral}.
+\href{https://leanprover-community.github.io/mathlib4_docs/Mathlib/Analysis/SpecialFunctions/Gaussian/GaussianIntegral.html}{Official module documentation}.
+In particular \texttt{integral\_\allowbreak gaussian}.
+
+\bibitem{ml-bernstein}
+The mathlib community. \emph{Mathlib.Analysis.SpecialFunctions.Bernstein}.
+\href{https://leanprover-community.github.io/mathlib4_docs/Mathlib/Analysis/SpecialFunctions/Bernstein.html}{Official module documentation}.
+In particular \texttt{bernsteinApproximation\_\allowbreak uniform}.
+
+\bibitem{ml-rmk}
+The mathlib community. \emph{Mathlib.MeasureTheory.Integral.RieszMarkovKakutani.Real}.
+\href{https://leanprover-community.github.io/mathlib4_docs/Mathlib/MeasureTheory/Integral/RieszMarkovKakutani/Real.html}{Official module documentation}.
+The positive-functional representation theorem for compactly supported real continuous functions; used only on compact metric spaces.
+
+\bibitem{ml-mp}
+The mathlib community. \emph{Mathlib.Dynamics.Ergodic.MeasurePreserving}.
+\href{https://leanprover-community.github.io/mathlib4_docs/Mathlib/Dynamics/Ergodic/MeasurePreserving.html}{Official module documentation}.
+Definitions and substitution identities for measure-preserving maps; no pointwise ergodic theorem from this library area is assumed.
+\end{thebibliography}
+\end{document}
