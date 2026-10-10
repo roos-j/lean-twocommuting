@@ -1173,7 +1173,7 @@ theorem nonnegative_Lp_norm_test {U : ℝ × ℝ → ℝ} (hU0 : 0 ≤ U)
   have happ : ∀ n : ℕ, ∃ g : ℝ × ℝ → ℝ, HasCompactSupport g ∧
       eLpNorm (H0 - g) p3 ≤ ENNReal.ofReal (1 / (n + 1)) ∧ Continuous g ∧ MemLp g p3 :=
     fun n => hH0.exists_hasCompactSupport_eLpNorm_sub_le ENNReal.ofReal_ne_top
-      (by simp; positivity)
+      (by simp only [one_div, ne_eq, ENNReal.ofReal_eq_zero, inv_nonpos, not_le]; positivity)
   choose g hgs hgε hgc hgL using happ
   set Hn : ℕ → ℝ × ℝ → ℝ := fun n x => |g n x|
   have hHnL : ∀ n, MemLp (Hn n) p3 := fun n => (hgL n).abs

@@ -236,7 +236,7 @@ lemma exists_fin_shift {R : ℕ} {w : ℤ} (h : |w| ≤ R) : ∃ i : Fin (2 * R 
   have h1 := neg_abs_le w
   have h2 := le_abs_self w
   refine ⟨⟨(w + R).toNat, by omega⟩, ?_⟩
-  show (((w + R).toNat : ℕ) : ℤ) - R = w
+  change (((w + R).toNat : ℕ) : ℤ) - R = w
   omega
 
 /-- A finite sum over an injective parametrization of the support is the lattice sum. -/
@@ -342,7 +342,7 @@ theorem tri_lattice_bound {m : ℕ} (hm : m = 3 ∨ m = 4) (hn : 1 ≤ n) (hlt :
         nlinarith)
       refine ⟨(i, j, k), ?_⟩
       funext l
-      fin_cases l <;> simp [e, hi, hj, hk'] <;> ring
+      fin_cases l <;> simp [e, hi, hj, hk'] ; ring
     rw [HeatData.D03sum, Complex.real_smul, ← sum_eq_tsum_of_injective e he _ hs,
       Fintype.sum_prod_type, Fintype.sum_congr _ _ fun i => Fintype.sum_prod_type _]
     congr 1
@@ -360,7 +360,7 @@ theorem tri_lattice_bound {m : ℕ} (hm : m = 3 ∨ m = 4) (hn : 1 ≤ n) (hlt :
       rintro ⟨i, j⟩ ⟨i', j'⟩ hij
       have h0 := congrFun hij 0
       have h1 := congrFun hij 1
-      simp only [e, Matrix.cons_val_zero, Matrix.cons_val_one, Matrix.head_cons, neg_inj] at h0 h1
+      simp only [e, Matrix.cons_val_zero, Matrix.cons_val_one, neg_inj] at h0 h1
       rw [hk h0, hk h1]
     have hs : ∀ z : Fin 2 → ℤ, ‖H ((z 0 : ℝ) / N, (z 1 : ℝ) / N)‖ ^ 3 ≠ 0 → z ∈ Set.range e := by
       intro z hz0
@@ -375,7 +375,7 @@ theorem tri_lattice_bound {m : ℕ} (hm : m = 3 ∨ m = 4) (hn : 1 ≤ n) (hlt :
     rw [← sum_eq_tsum_of_injective e he _ hs, Fintype.sum_prod_type]
     congr 2
     refine Finset.sum_congr rfl fun i _ => Finset.sum_congr rfl fun j _ => ?_
-    simp only [e, hHd, Matrix.cons_val_zero, Matrix.cons_val_one, Matrix.head_cons, hz, u]
+    simp only [e, hHd, Matrix.cons_val_zero, Matrix.cons_val_one, hz, u]
     push_cast
     ring_nf
   have hn1 : nNorm Hd.h (Hd.A 1) =
@@ -386,7 +386,7 @@ theorem tri_lattice_bound {m : ℕ} (hm : m = 3 ∨ m = 4) (hn : 1 ≤ n) (hlt :
       rintro ⟨i, j⟩ ⟨i', j'⟩ hij
       have h0 := congrFun hij 0
       have h1 := congrFun hij 1
-      simp only [e, Matrix.cons_val_zero, Matrix.cons_val_one, Matrix.head_cons, neg_inj] at h0 h1
+      simp only [e, Matrix.cons_val_zero, Matrix.cons_val_one, neg_inj] at h0 h1
       have := hk h1
       subst i'
       rw [hk (by linarith : kk j = kk j')]
@@ -405,7 +405,7 @@ theorem tri_lattice_bound {m : ℕ} (hm : m = 3 ∨ m = 4) (hn : 1 ≤ n) (hlt :
     rw [← sum_eq_tsum_of_injective e he _ hs, Fintype.sum_prod_type]
     congr 2
     refine Finset.sum_congr rfl fun i _ => Finset.sum_congr rfl fun j _ => ?_
-    simp only [e, hHd, Matrix.cons_val_zero, Matrix.cons_val_one, Matrix.head_cons, hz, u]
+    simp only [e, hHd, Matrix.cons_val_zero, Matrix.cons_val_one, hz, u]
     push_cast
     ring_nf
   have hn2 : nNorm Hd.h (Hd.A 2) =
@@ -416,7 +416,7 @@ theorem tri_lattice_bound {m : ℕ} (hm : m = 3 ∨ m = 4) (hn : 1 ≤ n) (hlt :
       rintro ⟨i, j⟩ ⟨i', j'⟩ hij
       have h0 := congrFun hij 0
       have h1 := congrFun hij 1
-      simp only [e, Matrix.cons_val_zero, Matrix.cons_val_one, Matrix.head_cons, neg_inj] at h0 h1
+      simp only [e, Matrix.cons_val_zero, Matrix.cons_val_one, neg_inj] at h0 h1
       have := hk h0
       subst j'
       rw [hk (by linarith : kk i = kk i')]
@@ -435,8 +435,8 @@ theorem tri_lattice_bound {m : ℕ} (hm : m = 3 ∨ m = 4) (hn : 1 ≤ n) (hlt :
     rw [← sum_eq_tsum_of_injective e he _ hs, Fintype.sum_prod_type]
     congr 2
     refine Finset.sum_congr rfl fun i _ => Finset.sum_congr rfl fun j _ => ?_
-    simp only [e, hHd, Matrix.cons_val_two, Matrix.tail_cons, Matrix.cons_val_zero,
-      Matrix.cons_val_one, Matrix.head_cons, hz, u]
+    simp only [e, hHd, Matrix.cons_val_zero,
+      Matrix.cons_val_one, hz, u]
     push_cast
     ring_nf
   rw [hD, hn0, hn1, hn2] at key
@@ -511,11 +511,11 @@ lemma triInt_bdd_supp (m : ℕ) (hsm : 0 < sm) {κ : Type*} [Finite κ]
       have : ‖x‖ ≤ 3 * ρ := by
         refine (pi_norm_le_iff_of_nonneg (by linarith)).2 fun i => ?_
         fin_cases i
-        · show ‖x 0‖ ≤ 3 * ρ
+        · change ‖x 0‖ ≤ 3 * ρ
           simp only [Real.norm_eq_abs] at hp ⊢; linarith [hp.1]
-        · show ‖x 1‖ ≤ 3 * ρ
+        · change ‖x 1‖ ≤ 3 * ρ
           simp only [Real.norm_eq_abs] at hp ⊢; linarith [hp.2]
-        · show ‖x 2‖ ≤ 3 * ρ
+        · change ‖x 2‖ ≤ 3 * ρ
           rw [Real.norm_eq_abs]; linarith
       linarith
     have : ρ < ‖(x 0 + x 2, x 1)‖ := by
@@ -524,7 +524,7 @@ lemma triInt_bdd_supp (m : ℕ) (hsm : 0 < sm) {κ : Type*} [Finite κ]
       have h0 : |x 0| ≤ ρ := by simpa using hp.1
       have := abs_sub_abs_le_abs_sub (x 2) (-(x 0))
       simp only [abs_neg, sub_neg_eq_add] at this
-      show ρ < ‖x 0 + x 2‖
+      change ρ < ‖x 0 + x 2‖
       rw [Real.norm_eq_abs, add_comm]; linarith
     rw [hF _ this]; ring
 
@@ -602,7 +602,8 @@ theorem tri_rect_bound {m : ℕ} (hm : m = 3 ∨ m = 4) (hn : 1 ≤ n) (hsm : 0 
   have hL : Tendsto (fun N : ℕ =>
       ‖((N : ℝ)⁻¹) ^ 3 • ∑' z : Fin 3 → ℤ, triInt m L c H F G (fun i => (z i : ℝ) / N)‖) atTop
       (𝓝 ‖∫ x, triInt m L c H F G x‖) := (continuous_norm.tendsto _).comp hA
-  have hR := ((((tendsto_lattice_norm_cube hHc hHs).rpow_const (p := 1 / 3) (Or.inr (by norm_num))).const_mul
+  have hR := ((((tendsto_lattice_norm_cube hHc hHs).rpow_const (p := 1 / 3) (Or.inr (by
+      norm_num))).const_mul
     (7 * constD03 * √n)).mul ((tendsto_lattice_norm_cube hFc hFs).rpow_const
       (p := 1 / 3) (Or.inr (by norm_num)))).mul ((tendsto_lattice_norm_cube hGc hGs).rpow_const
       (p := 1 / 3) (Or.inr (by norm_num)))
@@ -812,7 +813,7 @@ lemma list_sum_map_eq_sum_range {α M : Type*} [AddCommMonoid M] (l : List α) (
   | nil => simp
   | cons a l ih =>
     rw [List.map_cons, List.sum_cons, ih]
-    show _ = ∑ ℓ ∈ Finset.range (l.length + 1), _
+    change _ = ∑ ℓ ∈ Finset.range (l.length + 1), _
     rw [Finset.sum_range_succ', add_comm]
     simp
 
@@ -832,7 +833,7 @@ lemma exists_phase (z : ℂ) : ∃ j : Fin 4, ‖z‖ ≤ 2 * (phase j * z).re :
   have e0 : (phase 0 * z).re = z.re := by simp [phase]
   have e1 : (phase 1 * z).re = -z.im := by simp [phase]
   have e2 : (phase 2 * z).re = -z.re := by simp [phase, pow_two]
-  have e3 : (phase 3 * z).re = z.im := by simp [phase, pow_succ, pow_two]
+  have e3 : (phase 3 * z).re = z.im := by simp [phase, pow_succ]
   rcases le_total |z.im| |z.re| with hc | hc
   · rcases le_total 0 z.re with hr | hr
     · exact ⟨0, by rw [e0]; rw [abs_of_nonneg hr] at hc h; linarith⟩
@@ -896,9 +897,10 @@ section Selection
 
 /-- A measurable maximizing selector among finitely many measurable real functions (least
 maximizing index in an enumeration). -/
-lemma exists_measurable_argmax {X : Type*} [MeasurableSpace X] {κ : Type*} [Fintype κ]
+lemma exists_measurable_argmax {X : Type*} [MeasurableSpace X] {κ : Type*} [Finite κ]
     [Nonempty κ] (f : κ → X → ℝ) (hf : ∀ k, Measurable (f k)) :
     ∃ c : X → κ, (∀ k, MeasurableSet (c ⁻¹' {k})) ∧ ∀ x k, f k x ≤ f (c x) x := by
+  let := Fintype.ofFinite κ
   classical
   set K := Fintype.card κ
   set e : κ ≃ Fin K := Fintype.equivFin κ
@@ -943,7 +945,7 @@ lemma exists_measurable_argmax {X : Type*} [MeasurableSpace X] {κ : Type*} [Fin
     exact (hPm _).inter (MeasurableSet.biInter (Finset.range _).countable_toSet
       fun i _ => (hPm i).compl)
   · obtain ⟨hlt, hc⟩ := Nat.find_spec (hex x)
-    show f k x ≤ f (e.symm ⟨Nat.find (hex x), _⟩) x
+    change f k x ≤ f (e.symm ⟨Nat.find (hex x), _⟩) x
     rw [hc]
     exact Finset.le_sup' (fun k => f k x) (Finset.mem_univ k)
 
@@ -1325,7 +1327,8 @@ theorem Sfin_bound {m : ℕ} (hm : m = 3 ∨ m = 4) (hn : 1 ≤ n) (𝓕 : Finse
       refine hc.trans ?_
       have hK1 : eLpNorm (fun t => (Kern m (I.ival ℓ).1 (I.ival ℓ).2 t : ℂ)) 1 volume =
           ENNReal.ofReal (k (I.ival ℓ)) :=
-        (ENNReal.ofReal_toReal (memLp_one_iff_integrable.2 (integrable_KernC m hq)).eLpNorm_ne_top).symm
+        (ENNReal.ofReal_toReal (memLp_one_iff_integrable.2 (integrable_KernC m
+            hq)).eLpNorm_ne_top).symm
       have hG1 : eLpNorm G 3 volume = ENNReal.ofReal g :=
         (ENNReal.ofReal_toReal hG3.eLpNorm_ne_top).symm
       rw [hK1, hG1]
@@ -1408,7 +1411,8 @@ theorem Euclidean_counting_bound :
         (∫⁻ p, countingSup n (fun u v => ‖bilinKernel (KernC m u v) F G p‖ₑ) ^ (3 / 2 : ℝ)) ^
           (2 / 3 : ℝ) ≤ ENNReal.ofReal (C * √n) * eLpNorm F 3 * eLpNorm G 3 := by
   classical
-  refine ⟨14 * constD03, by have := constD03_nonneg; positivity, fun m hm n hn F G hF hG hF3 hG3 => ?_⟩
+  refine ⟨14 * constD03, by have := constD03_nonneg; positivity, fun m hm n hn F G hF hG hF3 hG3
+      => ?_⟩
   set X : ℝ≥0∞ := ENNReal.ofReal (14 * constD03 * √n) * eLpNorm F 3 * eLpNorm G 3
   -- enumerate the interval lists
   have : Nonempty (RatIntervalList n) :=

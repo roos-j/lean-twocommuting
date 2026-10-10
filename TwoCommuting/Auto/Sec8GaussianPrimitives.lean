@@ -1031,7 +1031,8 @@ lemma integral_scaleAvgS02 (m : ℕ) (ha : Measurable a) (hM : ∀ t, ‖a t‖ 
     rw [integral_integral_swap (integrable_prod_scaleAvgS02 m ha hM (β := β) hα)]
     refine integral_congr_ae (Eventually.of_forall fun t => ?_)
     simp only
-    rw [integral_const_mul, KernC, Kern_eq, intervalIntegral.integral_of_le hab, integral_complex_ofReal]
+    rw [integral_const_mul, KernC, Kern_eq, intervalIntegral.integral_of_le hab,
+        integral_complex_ofReal]
   rcases le_total α β with h | h
   · exact key hα h
   · rw [intervalIntegral.integral_symm, key hβ h, ← integral_neg]

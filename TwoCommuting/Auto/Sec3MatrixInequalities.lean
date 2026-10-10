@@ -113,6 +113,7 @@ lemma re_trace_nonneg_of_posSemidef {P : Matrix n n ℂ} (hP : P.PosSemidef) :
   have := hP.trace_nonneg
   exact (Complex.nonneg_iff.1 this).1
 
+omit [DecidableEq m] in
 /-- `Re tr(Zᴴ B Z) ≥ β ‖Z‖²_HS` when `B ≥ β`. -/
 lemma re_trace_conj_mul_mul_ge {B : Matrix n n ℂ} {β : ℝ}
     (hB : (B - (β : ℂ) • (1 : Matrix n n ℂ)).PosSemidef) (Z : Matrix n m ℂ) :
@@ -147,6 +148,7 @@ lemma sylvester_lower {B : Matrix n n ℂ} {A : Matrix m m ℂ} {α β : ℝ}
     exact this
   linarith
 
+omit [DecidableEq m] [DecidableEq n] in
 /-- Helper: the HS norm controls the HS norm of a product by a matrix of operator norm
 `≤ 1`-type bound; here, the submultiplicativity `‖XY‖²_HS ≤ ‖X‖²_HS ‖Y‖²_HS`. -/
 lemma hsSq_mul_le {k : Type*} [Fintype k] (X : Matrix m n ℂ) (Y : Matrix n k ℂ) :
@@ -239,6 +241,7 @@ theorem energyReg_conjTranspose_mul_self_eq (η : ℝ) (R : Matrix m n ℂ) :
     energyReg η (Rᴴ * R) = energyReg η (R * Rᴴ) :=
   trF_conjTranspose_mul_self_eq _ (by simp) R
 
+omit [DecidableEq m] in
 /-- **Lemma 3.1 (node M01).** `Φ(Rᴴ R) ≤ ‖R‖³_HS`. -/
 theorem energy_conjTranspose_mul_self_le (R : Matrix m n ℂ) :
     energy (Rᴴ * R) ≤ hsSq R ^ (3 / 2 : ℝ) := by
@@ -575,7 +578,7 @@ lemma eigCoord_sub {P : Matrix n n ℂ} (hP : P.IsHermitian) (K L : Matrix n n �
 omit [Fintype m] [DecidableEq m] in
 lemma eigCoord_smul {P : Matrix n n ℂ} (hP : P.IsHermitian) (c : ℝ) (K : Matrix n n ℂ) :
     eigCoord hP (c • K) = c • eigCoord hP K := by
-  simp [eigCoord, Matrix.mul_smul, Matrix.smul_mul]
+  simp [eigCoord]
 
 omit [Fintype m] [DecidableEq m] in
 lemma sqrt_eigenvalues_pos {P : Matrix n n ℂ} (hP : P.PosDef) (i : n) :
@@ -908,6 +911,7 @@ theorem hasDerivAt_sqrt_curve {Y : ℝ → Matrix n n ℂ} {Y' : Matrix n n ℂ}
 
 /-! #### Derivatives of the energy -/
 
+omit [Fintype n] in
 lemma posDef_add_smul_one {P : Matrix n n ℂ} (hP : P.PosSemidef) {η : ℝ} (hη : 0 < η) :
     (P + (η : ℂ) • (1 : Matrix n n ℂ)).PosDef :=
   Matrix.PosDef.posSemidef_add hP (Matrix.PosDef.one.smul (by exact_mod_cast hη))
@@ -941,7 +945,7 @@ lemma add_smul_one_eq_conj {P : Matrix n n ℂ} (hP : P.IsHermitian) (c : ℝ) :
   conv_lhs => rw [hP.spectral_theorem, Unitary.conjStarAlgAut_apply]
   rw [show diagonal (fun i => ((hP.eigenvalues i + c : ℝ) : ℂ)) =
     diagonal (RCLike.ofReal ∘ hP.eigenvalues) + (c : ℂ) • 1 by
-      ext i j; by_cases h : i = j <;> simp [h, Matrix.diagonal_apply]]
+      ext i j; by_cases h : i = j <;> simp [h]]
   rw [Matrix.mul_add, Matrix.add_mul, Matrix.mul_smul, Matrix.smul_mul, Matrix.mul_one, hUU]
 
 /-- Helper for M02: the eigen-decomposition of `P + η`, its square root, and the energy. -/
@@ -1035,9 +1039,11 @@ theorem hasDerivAt_energyReg {P : ℝ → Matrix n n ℂ} {P' : Matrix n n ℂ} 
   norm_num
   ring
 
+omit [Fintype n] in
 /-- Helper: a positive definite matrix has a positive lower bound `Y ≥ μ > 0`. -/
-lemma exists_lower_bound_of_posDef {Y : Matrix n n ℂ} (hY : Y.PosDef) :
+lemma exists_lower_bound_of_posDef [Finite n] {Y : Matrix n n ℂ} (hY : Y.PosDef) :
     ∃ μ : ℝ, 0 < μ ∧ (Y - (μ : ℂ) • (1 : Matrix n n ℂ)).PosSemidef := by
+  let := Fintype.ofFinite n
   by_cases hn : IsEmpty n
   · exact ⟨1, one_pos, by
       rw [show Y - ((1 : ℝ) : ℂ) • (1 : Matrix n n ℂ) = 0 from Subsingleton.elim _ _]
@@ -1157,9 +1163,13 @@ theorem hasDerivAt_energy_hessian {P G : ℝ → Matrix n n ℂ} {P' G' : Matrix
 
 /-! #### Comparison -/
 
+omit [DecidableEq n] in
 /-- Helper: `√(aQ) = √a √Q` for `Q ≥ 0`, `a ≥ 0`. -/
-lemma sqrt_smul_eq {Q : Matrix n n ℂ} (hQ : Q.PosSemidef) {a : ℝ} (ha : 0 ≤ a) :
+lemma sqrt_smul_eq {n : Type*} [Fintype n] {Q : Matrix n n ℂ}
+    (hQ : Q.PosSemidef) {a : ℝ} (ha : 0 ≤ a) :
+    open scoped Classical in
     CFC.sqrt ((a : ℂ) • Q) = ((√a : ℝ) : ℂ) • CFC.sqrt Q := by
+  classical
   have hs : (CFC.sqrt Q).PosSemidef := (CFC.sqrt_nonneg Q).posSemidef
   have hnn : 0 ≤ ((√a : ℝ) : ℂ) • CFC.sqrt Q :=
     (hs.smul (by exact_mod_cast Real.sqrt_nonneg a : (0 : ℂ) ≤ ((√a : ℝ) : ℂ))).nonneg
@@ -1212,7 +1222,7 @@ theorem matCost_comparison {P Q : Matrix n n ℂ} (hQ : Q.PosSemidef) {a : ℝ} 
 /-! #### The insertion estimate -/
 
 omit [DecidableEq n] in
-lemma conj_sub_posSemidef {k : Type*} [Fintype k] {A B : Matrix n n ℂ}
+lemma conj_sub_posSemidef {k : Type*} [Finite k] {A B : Matrix n n ℂ}
     (hAB : (B - A).PosSemidef) (C : Matrix n k ℂ) :
     (Cᴴ * B * C - Cᴴ * A * C).PosSemidef := by
   have := hAB.conjTranspose_mul_mul_same C
@@ -1454,7 +1464,7 @@ variable {n : Type*} [Fintype n] [DecidableEq n] {Z : Type*} [MeasurableSpace Z]
 def matIntegral (ν : Measure Z) (M : Z → Matrix n n ℂ) : Matrix n n ℂ :=
   Matrix.of fun i j => ∫ z, M z i j ∂ν
 
-omit [DecidableEq n] in
+omit [DecidableEq n] [Fintype n] in
 lemma matIntegral_apply (M : Z → Matrix n n ℂ) (i j : n) :
     matIntegral ν M i j = ∫ z, M z i j ∂ν := rfl
 
@@ -1524,11 +1534,12 @@ lemma integrable_re_trace_mul {M : Z → Matrix n n ℂ}
   exact integrable_finsetSum _ fun i _ => integrable_finsetSum _ fun j _ =>
     ((hM i j).mul_const _).re
 
-omit [DecidableEq n] in
+omit [DecidableEq n] [Fintype n] in
 /-- Helper for M03: the entrywise integral of positive semidefinite matrices is positive
 semidefinite. -/
-lemma matIntegral_posSemidef {M : Z → Matrix n n ℂ} (hM : ∀ z, (M z).PosSemidef)
+lemma matIntegral_posSemidef [Finite n] {M : Z → Matrix n n ℂ} (hM : ∀ z, (M z).PosSemidef)
     (hMi : ∀ i j, Integrable (fun z => M z i j) ν) : (matIntegral ν M).PosSemidef := by
+  let := Fintype.ofFinite n
   rw [Matrix.posSemidef_iff_dotProduct_mulVec]
   have hint : ∀ x : n → ℂ, Integrable (fun z => star x ⬝ᵥ (M z *ᵥ x)) ν := by
     intro x
@@ -1666,7 +1677,7 @@ theorem matCost_average_le [IsProbabilityMeasure ν] {T K : Z → Matrix n n ℂ
           calc _ = (∫ z, (T z i j - (S z * A) i j) ∂ν) - ∫ z, (A * S z) i j ∂ν :=
                 integral_sub ((hTi i j).sub hI1) hI2
             _ = _ := by rw [integral_sub (hTi i j) hI1]
-    show matIntegral ν T i j - (A * A) i j = matIntegral ν (fun z => (S z - A)ᴴ * (S z - A)) i j
+    change matIntegral ν T i j - (A * A) i j = matIntegral ν (fun z => (S z - A)ᴴ * (S z - A)) i j
     rw [matIntegral_apply, matIntegral_apply, e1, e2, (hmulA S hSi A i j).2.2.1,
       (hmulA S hSi A i j).2.2.2]
     ring
@@ -1731,7 +1742,7 @@ section M04
 
 variable {m n : Type*} [Fintype m] [Fintype n] [DecidableEq m] [DecidableEq n]
 
-omit [DecidableEq m] [DecidableEq n] in
+omit [DecidableEq m] [DecidableEq n] [Fintype n] in
 /-- Helper: entrywise derivative of the Gram matrix `R(z)ᴴ R(z)` of a matrix curve. -/
 lemma hasDerivAt_gram {R : ℝ → Matrix m n ℂ} {R' : Matrix m n ℂ} {z₀ : ℝ}
     (hR : ∀ i j, HasDerivAt (fun z => R z i j) (R' i j) z₀) :
@@ -1745,7 +1756,7 @@ lemma hasDerivAt_gram {R : ℝ → Matrix m n ℂ} {R' : Matrix m n ℂ} {z₀ :
     simpa using this
   exact hc.mul (hR k j)
 
-omit [DecidableEq m] in
+omit [DecidableEq m] [DecidableEq n] in
 /-- Helper for M04: `(3/2) Re tr(√Y (Dᴴ R + Rᴴ D)) = 3 Re ⟨R √Y, D⟩` for Hermitian `√Y`. -/
 lemma re_trace_sqrt_gram_deriv (R D : Matrix m n ℂ) {A : Matrix n n ℂ} (hA : A.IsHermitian) :
     (3 / 2) * ((A * (Dᴴ * R + Rᴴ * D)).trace).re = 3 * hsRe (R * A) D := by
@@ -1756,7 +1767,7 @@ lemma re_trace_sqrt_gram_deriv (R D : Matrix m n ℂ) {A : Matrix n n ℂ} (hA :
         Matrix.mul_assoc]
     rw [this, RCLike.star_def, Complex.conj_re]
   have h2 : hsRe (R * A) D = ((A * (Rᴴ * D)).trace).re := by
-    show (((R * A)ᴴ * D).trace).re = _
+    change (((R * A)ᴴ * D).trace).re = _
     rw [Matrix.conjTranspose_mul, hA.eq, Matrix.mul_assoc]
   rw [Matrix.mul_add, Matrix.trace_add, Complex.add_re, h1, h2]
   ring
@@ -1944,19 +1955,19 @@ lemma matCost_isometry {k : Type*} [Fintype k] [DecidableEq k] (E : Matrix k n �
   have hsq : CFC.sqrt (E * T * Eᴴ) = E * S * Eᴴ := by
     have hnn : 0 ≤ E * S * Eᴴ := (hSp.mul_mul_conjTranspose_same E).nonneg
     refine CFC.sqrt_unique ?_ hnn
-    simp only [Matrix.mul_assoc, hE2, hE2k]
+    simp only [Matrix.mul_assoc, hE2k]
     rw [← Matrix.mul_assoc S S, hSS]
   have hcyc : ∀ (X Y : Matrix n n ℂ), hsRe (E * X * Eᴴ) (E * Y * Eᴴ) = hsRe X Y := by
     intro X Y
     unfold hsRe
     congr 1
     simp only [Matrix.conjTranspose_mul, Matrix.conjTranspose_conjTranspose, Matrix.mul_assoc,
-      hE2, hE2k]
+      hE2k]
     rw [Matrix.trace_mul_comm]
     simp only [Matrix.mul_assoc, hE, Matrix.mul_one]
   have hEE : ∀ (X Y : Matrix n n ℂ), E * X * Eᴴ * (E * Y * Eᴴ) = E * (X * Y) * Eᴴ := by
     intro X Y
-    simp only [Matrix.mul_assoc, hE2, hE2k]
+    simp only [Matrix.mul_assoc, hE2k]
   -- the projection complement `G = 1 - E Eᴴ`
   set G : Matrix k k ℂ := 1 - E * Eᴴ
   have hGH : Gᴴ = G := by
@@ -1964,7 +1975,7 @@ lemma matCost_isometry {k : Type*} [Fintype k] [DecidableEq k] (E : Matrix k n �
       Matrix.conjTranspose_conjTranspose]
   have hGG : G * G = G := by
     simp only [G, Matrix.sub_mul, Matrix.mul_sub, Matrix.one_mul, Matrix.mul_one,
-      Matrix.mul_assoc, hE2, hE2k]
+      Matrix.mul_assoc, hE2k]
     abel
   have hS0 : (S - ((0 : ℝ) : ℂ) • (1 : Matrix n n ℂ)).PosSemidef := by simpa using hSp
   apply le_antisymm
@@ -2222,7 +2233,7 @@ theorem norm_cubic_sum_le (m : κ → ℝ) {D : Matrix κ κ ℂ} (hD : D.IsHerm
   have hq0 : ∀ i, 0 ≤ q i := fun i => abs_nonneg _
   -- an order with decreasing `q`
   set e := Fintype.equivFin κ
-  letI : LinearOrder κ := LinearOrder.lift' (fun i => toLex (OrderDual.toDual (q i), e i))
+  let : LinearOrder κ := LinearOrder.lift' (fun i => toLex (OrderDual.toDual (q i), e i))
     (fun i j h => by
       have := congrArg (fun x => (ofLex x).2) h
       exact e.injective this)
@@ -2263,7 +2274,7 @@ theorem norm_cubic_sum_le (m : κ → ℝ) {D : Matrix κ κ ℂ} (hD : D.IsHerm
       rw [Finset.mul_sum]
       split_ifs with hj
       · refine Finset.sum_congr rfl fun k _ => ?_
-        simp only [v, hj, if_true]
+        simp only [v, hj, ite_true]
         split_ifs with hk
         · rw [star_mul', ← hD.apply μ j]
           simp only [RCLike.star_def, Complex.conj_ofReal]
@@ -2326,7 +2337,7 @@ theorem norm_cubic_sum_le (m : κ → ℝ) {D : Matrix κ κ ℂ} (hD : D.IsHerm
   -- third group
   have hT3 : ∀ μ, ‖((m μ * m μ * m μ : ℝ) : ℂ) * D μ μ * D μ μ * D μ μ‖ ≤ d * A μ := by
     intro μ
-    simp only [norm_mul, Complex.norm_real, Real.norm_eq_abs, abs_mul, A]
+    simp only [norm_mul, Complex.norm_real, Real.norm_eq_abs, A]
     have h := hdiag μ
     have := norm_nonneg (D μ μ)
     have hq := hq0 μ
@@ -2414,11 +2425,12 @@ lemma blk3_mul (X Y : Matrix (Fin 3) (Fin 3) (Matrix ι ι ℂ)) :
     blk3 (X * Y) = blk3 X * blk3 Y :=
   (Matrix.compRingEquiv (Fin 3) ι ℂ).map_mul X Y
 
-omit [DecidableEq ι] in
+omit [DecidableEq ι] [Fintype ι] in
 lemma blk3_add (X Y : Matrix (Fin 3) (Fin 3) (Matrix ι ι ℂ)) :
-    blk3 (X + Y) = blk3 X + blk3 Y :=
-  (Matrix.compRingEquiv (Fin 3) ι ℂ).map_add X Y
+    blk3 (X + Y) = blk3 X + blk3 Y := by
+  rfl
 
+omit [Fintype ι] in
 lemma blk3_one : blk3 (1 : Matrix (Fin 3) (Fin 3) (Matrix ι ι ℂ)) = 1 := Matrix.comp_one
 
 omit [DecidableEq ι] in
@@ -2439,7 +2451,7 @@ lemma emb2_isometry {p r : Fin 3} (hpr : p ≠ r) :
     simp only [emb2, Matrix.mul_apply, Matrix.conjTranspose_apply, Matrix.of_apply,
       Sum.elim_inl, Sum.elim_inr, Matrix.one_apply, Prod.mk.injEq,
       apply_ite star, star_one, star_zero, ite_and, mul_ite, mul_one, mul_zero,
-      Finset.sum_ite_eq, Finset.sum_ite_eq', Finset.mem_univ, ite_true, Sum.inl.injEq,
+      Finset.sum_ite_eq', Finset.mem_univ, ite_true, Sum.inl.injEq,
       Sum.inr.injEq, reduceCtorEq, ite_false] <;>
     simp [hpr, hpr.symm, eq_comm]
 
@@ -2470,7 +2482,7 @@ lemma emb2_conj_fromBlocks₀₁ (X11 X12 X21 X22 : Matrix ι ι ℂ) :
     Matrix.fromBlocks_apply₁₂, Matrix.fromBlocks_apply₂₁, Matrix.fromBlocks_apply₂₂]
   fin_cases w <;> fin_cases w' <;> simp [Prod.ext_iff]
 
-omit [DecidableEq ι] in
+omit [DecidableEq ι] [Fintype ι] in
 lemma blk3_conjTranspose (a b c d e f g h i : Matrix ι ι ℂ) :
     (blk3 !![a, b, c; d, e, f; g, h, i])ᴴ = blk3 !![aᴴ, dᴴ, gᴴ; bᴴ, eᴴ, hᴴ; cᴴ, fᴴ, iᴴ] := by
   ext ⟨w, x⟩ ⟨w', y⟩
@@ -2505,14 +2517,13 @@ lemma rowMat_insert (W V D : Matrix ι ι ℂ) :
     (rowMat W V)ᴴ * D * rowMat W V =
       Matrix.fromBlocks (Wᴴ * D * W) (Wᴴ * D * Vᴴ) (V * D * W) (V * D * Vᴴ) := by
   simp [rowMat, Matrix.conjTranspose_fromCols_eq_fromRows_conjTranspose,
-    Matrix.fromRows_mul_fromCols, Matrix.mul_assoc]
+    Matrix.mul_assoc]
 
 omit [DecidableEq ι] in
 lemma rowMat_gram (W V : Matrix ι ι ℂ) :
     (rowMat W V)ᴴ * rowMat W V =
       Matrix.fromBlocks (Wᴴ * W) (Wᴴ * Vᴴ) (V * W) (V * Vᴴ) := by
-  simp [rowMat, Matrix.conjTranspose_fromCols_eq_fromRows_conjTranspose,
-    Matrix.fromRows_mul_fromCols]
+  simp [rowMat, Matrix.conjTranspose_fromCols_eq_fromRows_conjTranspose]
 
 variable (W0 W1 W2 D0 D1 D2 : Matrix ι ι ℂ)
 
@@ -2564,23 +2575,23 @@ lemma cyc_backward_conj (hD0 : D0.IsHermitian) (hD1 : D1.IsHermitian) (hD2 : D2.
   simp only [Matrix.mul_assoc] at this
   rw [this]
 
-omit [DecidableEq ι] in
+omit [DecidableEq ι] [Fintype ι] in
 lemma cycMb_isHermitian : (blk3 (cycMb W0 W1 W2)).IsHermitian := by
   rw [Matrix.IsHermitian, cycMb, blk3_conjTranspose]
   simp
 
-omit [DecidableEq ι] in
+omit [DecidableEq ι] [Fintype ι] in
 lemma cycDb_isHermitian (hD0 : D0.IsHermitian) (hD1 : D1.IsHermitian) (hD2 : D2.IsHermitian) :
     (blk3 (cycDb D0 D1 D2)).IsHermitian := by
   rw [Matrix.IsHermitian, cycDb, blk3_conjTranspose]
   simp [hD0.eq, hD1.eq, hD2.eq]
 
-omit [DecidableEq ι] in
+omit [DecidableEq ι] [Fintype ι] in
 lemma blk3_smul (c : ℂ) (X : Matrix (Fin 3) (Fin 3) (Matrix ι ι ℂ)) :
     blk3 (c • X) = c • blk3 X := by
   ext ⟨v, a⟩ ⟨w, b⟩; simp [blk3, Matrix.comp_apply]
 
-lemma cyc_sq_bound (hD0 : D0.IsHermitian) (hD1 : D1.IsHermitian) (hD2 : D2.IsHermitian) {d : ℝ}
+lemma cyc_sq_bound {d : ℝ}
     (h0 : ((d ^ 2 : ℝ) • (1 : Matrix ι ι ℂ) - D0 * D0).PosSemidef)
     (h1 : ((d ^ 2 : ℝ) • (1 : Matrix ι ι ℂ) - D1 * D1).PosSemidef)
     (h2 : ((d ^ 2 : ℝ) • (1 : Matrix ι ι ℂ) - D2 * D2).PosSemidef) :
@@ -2595,7 +2606,7 @@ lemma cyc_sq_bound (hD0 : D0.IsHermitian) (hD1 : D1.IsHermitian) (hD2 : D2.IsHer
         rw [blk3_smul]; rfl]
     ext ⟨v, a⟩ ⟨w, b⟩
     fin_cases v <;> fin_cases w <;>
-      simp [blk3, Matrix.comp_apply, cycDb, Matrix.mul_fin_three, Matrix.one_fin_three,
+      simp [blk3, Matrix.comp_apply, cycDb, Matrix.one_fin_three,
         Matrix.sub_apply, Matrix.smul_apply, Complex.real_smul]
   rw [e, blk3_diag_eq]
   refine ((h0.mul_mul_conjTranspose_same _).add (h1.mul_mul_conjTranspose_same _)).add
@@ -2703,7 +2714,7 @@ theorem cyc_cube_le (hD0 : D0.IsHermitian) (hD1 : D1.IsHermitian) (hD2 : D2.IsHe
   have hMH : M.IsHermitian := cycMb_isHermitian W0 W1 W2
   have hDH : D.IsHermitian := cycDb_isHermitian D0 D1 D2 hD0 hD1 hD2
   have hDd : ((d ^ 2 : ℝ) • (1 : Matrix (Fin 3 × ι) (Fin 3 × ι) ℂ) - D * D).PosSemidef :=
-    cyc_sq_bound D0 D1 D2 hD0 hD1 hD2 h0 h1 h2
+    cyc_sq_bound D0 D1 D2 h0 h1 h2
   have hMM : (M * M).PosSemidef := by
     have := Matrix.posSemidef_conjTranspose_mul_self M
     rwa [hMH.eq] at this
@@ -2746,7 +2757,7 @@ theorem cyc_cube_le (hD0 : D0.IsHermitian) (hD1 : D1.IsHermitian) (hD2 : D2.IsHe
     rw [rowMat_gram, emb2_conj_fromBlocks₁₂, ← blk3_mul, ← blk3_mul]
     congr 1
     ext v w; fin_cases v <;> fin_cases w <;>
-      simp [cycMb, cycP0, Matrix.mul_apply, Fin.sum_univ_three, Matrix.mul_assoc]
+      simp [cycMb, cycP0, Matrix.mul_apply, Fin.sum_univ_three]
   have hK0 : M * blk3 cycP0 * D * M =
       emb2 (ι := ι) 1 2 * ((rowMat W0 W2)ᴴ * D0 * rowMat W0 W2) * (emb2 (ι := ι) 1 2)ᴴ := by
     rw [rowMat_insert, emb2_conj_fromBlocks₁₂, ← blk3_mul, ← blk3_mul, ← blk3_mul]
@@ -2758,7 +2769,7 @@ theorem cyc_cube_le (hD0 : D0.IsHermitian) (hD1 : D1.IsHermitian) (hD2 : D2.IsHe
     rw [rowMat_gram, emb2_conj_fromBlocks₂₀, ← blk3_mul, ← blk3_mul]
     congr 1
     ext v w; fin_cases v <;> fin_cases w <;>
-      simp [cycMb, cycP1, Matrix.mul_apply, Fin.sum_univ_three, Matrix.mul_assoc]
+      simp [cycMb, cycP1, Matrix.mul_apply, Fin.sum_univ_three]
   have hK1 : M * blk3 cycP1 * D * M =
       emb2 (ι := ι) 2 0 * ((rowMat W1 W0)ᴴ * D1 * rowMat W1 W0) * (emb2 (ι := ι) 2 0)ᴴ := by
     rw [rowMat_insert, emb2_conj_fromBlocks₂₀, ← blk3_mul, ← blk3_mul, ← blk3_mul]
@@ -2770,7 +2781,7 @@ theorem cyc_cube_le (hD0 : D0.IsHermitian) (hD1 : D1.IsHermitian) (hD2 : D2.IsHe
     rw [rowMat_gram, emb2_conj_fromBlocks₀₁, ← blk3_mul, ← blk3_mul]
     congr 1
     ext v w; fin_cases v <;> fin_cases w <;>
-      simp [cycMb, cycP2, Matrix.mul_apply, Fin.sum_univ_three, Matrix.mul_assoc]
+      simp [cycMb, cycP2, Matrix.mul_apply, Fin.sum_univ_three]
   have hK2 : M * blk3 cycP2 * D * M =
       emb2 (ι := ι) 0 1 * ((rowMat W2 W1)ᴴ * D2 * rowMat W2 W1) * (emb2 (ι := ι) 0 1)ᴴ := by
     rw [rowMat_insert, emb2_conj_fromBlocks₀₁, ← blk3_mul, ← blk3_mul, ← blk3_mul]
@@ -2861,7 +2872,8 @@ theorem cyc_cube_le (hD0 : D0.IsHermitian) (hD1 : D1.IsHermitian) (hD2 : D2.IsHe
 
 lemma rowMat_cost_unitary (R : Matrix ι (ι ⊕ ι) ℂ) (Uu : Matrix (ι ⊕ ι) (ι ⊕ ι) ℂ)
     (hU : Uu * Uuᴴ = 1) (Dv : Matrix ι ι ℂ) :
-    matCost ((R * Uu)ᴴ * (R * Uu)) ((R * Uu)ᴴ * Dv * (R * Uu)) = matCost (Rᴴ * R) (Rᴴ * Dv * R) := by
+    matCost ((R * Uu)ᴴ * (R * Uu)) ((R * Uu)ᴴ * Dv * (R * Uu)) = matCost (Rᴴ * R) (Rᴴ * Dv * R)
+        := by
   have hE : (Uuᴴ)ᴴ * Uuᴴ = 1 := by rw [Matrix.conjTranspose_conjTranspose]; exact hU
   have h1 : (R * Uu)ᴴ * (R * Uu) = Uuᴴ * (Rᴴ * R) * (Uuᴴ)ᴴ := by
     rw [Matrix.conjTranspose_mul, Matrix.conjTranspose_conjTranspose]; simp only [Matrix.mul_assoc]
@@ -2879,8 +2891,8 @@ lemma phaseBlocks_unitary {c : ℂ} (hc : ‖c‖ = 1) (left : Bool) :
     rw [RCLike.star_def, Complex.mul_conj, Complex.normSq_eq_norm_sq, hc]; simp
   have hcc2 : (starRingEnd ℂ) c * c = 1 := by rw [mul_comm]; simpa using hcc
   cases left <;>
-    simp [Matrix.fromBlocks_conjTranspose, Matrix.fromBlocks_multiply, Matrix.smul_mul,
-      Matrix.mul_smul, smul_smul, hcc, hcc2, Matrix.fromBlocks_one, Matrix.conjTranspose_smul]
+    simp [Matrix.fromBlocks_conjTranspose, Matrix.fromBlocks_multiply, smul_smul, hcc2,
+        Matrix.fromBlocks_one, Matrix.conjTranspose_smul]
 
 /-- **Lemma 3.5 (node M05), cyclic trace.** Let `W₀, W₁, W₂` be square matrices (indices `v` are
 cyclic modulo three, `Wᵥ : H_{v+1} → Hᵥ`, all `Hᵥ` identified with one index type), let
@@ -2930,7 +2942,8 @@ theorem cyclic_trace_control (hD0 : D0.IsHermitian) (hD1 : D1.IsHermitian)
       Matrix.fromCols (W0 * (c • 1) + W2ᴴ * 0) (W0 * 0 + W2ᴴ * 1) from
         Matrix.fromCols_mul_fromBlocks _ _ _ _ _ _]
     simp [rowMat, W0']
-  have hR1 : rowMat W1 W0' = rowMat W1 W0 * Matrix.fromBlocks 1 0 0 (star c • (1 : Matrix ι ι ℂ)) := by
+  have hR1 : rowMat W1 W0' =
+      rowMat W1 W0 * Matrix.fromBlocks 1 0 0 (star c • (1 : Matrix ι ι ℂ)) := by
     rw [show rowMat W1 W0 * Matrix.fromBlocks 1 0 0 (star c • (1 : Matrix ι ι ℂ)) =
       Matrix.fromCols (W1 * 1 + W0ᴴ * 0) (W1 * 0 + W0ᴴ * (star c • 1)) from
         Matrix.fromCols_mul_fromBlocks _ _ _ _ _ _]

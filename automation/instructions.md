@@ -9,6 +9,13 @@ Discrepancies: [ErrorReport.md](ErrorReport.md).
 
 ## Current user instructions (distilled)
 
+- **P7** (2026-10-10T18:33:40-04:00, recording time, raw entry P7): Commit and push
+  the current warning-cleanup changes, including the updated root import.
+
+- **P6** (2026-10-10T17:56:16-04:00, recording time, raw entry P6): Fix all remaining Lean
+  and linter warnings by correcting their causes; do not disable warnings.
+  This maintenance task is the current scope.
+
 - **P1** (2026-10-08T21:40:01-04:00, raw entry P1): Formalize the main theorem
   of `blueprint/commuting_ergodic_blueprint.tex` (a.e. convergence of
   `N⁻¹ ∑_{n<N} f(Tⁿx) g(Sⁿx)` for commuting measure-preserving `T, S`).
@@ -100,6 +107,16 @@ theorem commuting_ergodic_averages_converge_ae
 
 ## Latest verification
 
+- 2026-10-10T18:09:42-04:00: P6 warning cleanup complete. `lake --wfail build` succeeds
+  (9031 jobs), including `TwoCommuting.Theorems`, now imported by the library root.
+  Fixed unused hypotheses and typeclass requirements, redundant tactics and simp
+  arguments, deprecated names, flexible simplification, and formatting; no warnings
+  were disabled. `#print axioms` for `pointwise_convergence_two_commuting` and
+  `Auto.commuting_ergodic_averages_converge_main` reports only `propext`,
+  `Classical.choice`, and `Quot.sound`. Source scan finds no placeholders or
+  linter suppression; the whitespace diff check passes with `cr-at-eol`, matching
+  the existing CRLF files.
+
 - 2026-10-08T23:46:02-04:00: `lake build` succeeds; `#print axioms` on the §2 and §3 node
   theorems (e.g. `Auto.lattice_sampling_dominated_convergence`,
   `Auto.nonnegative_Lp_norm_test`, `Auto.L1_kernel_bilinear_continuity`,
@@ -108,9 +125,6 @@ theorem commuting_ergodic_averages_converge_ae
 
 ## Next step
 
-- §4 (`TwoCommuting/Auto/Sec4GaussianEnergies.lean`): definitions of §4.1 and Lemma 4.1 (H01).
-  Plan: work on `ℝ³` with weight `g_{βs}(p₀+p₁+p₂)` (equivalent to the plane averages by the
-  change of variables `d = p₀+p₁+p₂`), regularized energies `Φ_η(T_v)`, derivatives from
-  `hasDerivAt_energyReg` / `hasDerivAt_energy_hessian`, and integrate the pointwise identity
-  in `s` by FTC + Fubini instead of differentiating `J̄` under the integral sign.
-- M05 is formalized with all three spaces `H_v` equal to one index type (the case used in §4).
+- P6 maintenance is complete; no remaining Lean or linter warnings in the standard build.
+- The earlier section 4 continuation note was stale: the source ledger already records
+  completion through section 10. This task did not reopen the formalization.

@@ -48,7 +48,7 @@ omit [Fintype ι] [Fintype κ] [DecidableEq κ] in
 lemma rdiag_isHermitian (f : ι → ℝ) : (rdiag f).IsHermitian := by
   simp [rdiag, Matrix.IsHermitian, Matrix.diagonal_conjTranspose]
 
-omit [Fintype κ] [DecidableEq κ] in
+omit [Fintype κ] [DecidableEq κ] [Fintype ι] in
 lemma rdiag_posSemidef {f : ι → ℝ} (hf : ∀ i, 0 ≤ f i) : (rdiag f).PosSemidef := by
   rw [rdiag, Matrix.posSemidef_diagonal_iff]
   intro i; exact_mod_cast hf i
@@ -56,23 +56,23 @@ lemma rdiag_posSemidef {f : ι → ℝ} (hf : ∀ i, 0 ≤ f i) : (rdiag f).PosS
 /-- The Gram matrix `Bᴴ diag(f) B` of a weight vector `f`. -/
 def wGram (B : Matrix ι κ ℂ) (f : ι → ℝ) : Matrix κ κ ℂ := Bᴴ * rdiag f * B
 
-omit [DecidableEq κ] in
-lemma wGram_posSemidef (B : Matrix ι κ ℂ) {f : ι → ℝ} (hf : ∀ i, 0 ≤ f i) :
-    (wGram B f).PosSemidef :=
-  (rdiag_posSemidef hf).conjTranspose_mul_mul_same B
+omit [DecidableEq κ] [Fintype κ] in
+lemma wGram_posSemidef [Finite κ] (B : Matrix ι κ ℂ) {f : ι → ℝ} (hf : ∀ i, 0 ≤ f i) :
+    (wGram B f).PosSemidef := by
+  exact (rdiag_posSemidef hf).conjTranspose_mul_mul_same B
 
-omit [DecidableEq κ] in
+omit [DecidableEq κ] [Fintype κ] in
 lemma wGram_isHermitian (B : Matrix ι κ ℂ) (f : ι → ℝ) : (wGram B f).IsHermitian := by
   rw [wGram, Matrix.IsHermitian, Matrix.conjTranspose_mul, Matrix.conjTranspose_mul,
     (rdiag_isHermitian f).eq, Matrix.conjTranspose_conjTranspose, Matrix.mul_assoc]
 
-omit [DecidableEq κ] in
+omit [DecidableEq κ] [Fintype κ] in
 lemma wGram_apply (B : Matrix ι κ ℂ) (f : ι → ℝ) (a b : κ) :
     wGram B f a b = ∑ i, star (B i a) * (f i : ℂ) * B i b := by
   rw [wGram, Matrix.mul_apply]
   simp only [rdiag, Matrix.mul_diagonal, Matrix.conjTranspose_apply]
 
-omit [DecidableEq κ] in
+omit [DecidableEq κ] [Fintype κ] in
 /-- Entrywise derivative of a weighted Gram matrix along a curve of weights. -/
 lemma hasDerivAt_wGram (B : Matrix ι κ ℂ) {f : ℝ → ι → ℝ} {f' : ι → ℝ} {θ₀ : ℝ}
     (hf : ∀ i, HasDerivAt (fun θ => f θ i) (f' i) θ₀) :
@@ -82,17 +82,17 @@ lemma hasDerivAt_wGram (B : Matrix ι κ ℂ) {f : ℝ → ι → ℝ} {f' : ι 
   refine HasDerivAt.fun_sum fun i _ => ?_
   exact ((hf i).ofReal_comp.const_mul _).mul_const _
 
-omit [DecidableEq κ] in
+omit [DecidableEq κ] [Fintype κ] in
 lemma wGram_add (B : Matrix ι κ ℂ) (f g : ι → ℝ) : wGram B (f + g) = wGram B f + wGram B g := by
   simp only [wGram, rdiag, Pi.add_apply, Complex.ofReal_add]
   rw [← Matrix.diagonal_add, Matrix.mul_add, Matrix.add_mul]
 
-omit [DecidableEq κ] in
+omit [DecidableEq κ] [Fintype κ] in
 lemma wGram_smul (B : Matrix ι κ ℂ) (c : ℝ) (f : ι → ℝ) :
     wGram B (c • f) = (c : ℂ) • wGram B f := by
   simp only [wGram, rdiag, Pi.smul_apply, smul_eq_mul, Complex.ofReal_mul]
   rw [show (diagonal fun i => (c : ℂ) * (f i : ℂ)) = (c : ℂ) • diagonal fun i => (f i : ℂ) by
-    ext i j; by_cases h : i = j <;> simp [h, Matrix.diagonal_apply]]
+    ext i j; by_cases h : i = j <;> simp [h]]
   rw [Matrix.mul_smul, Matrix.smul_mul]
 
 /-- The Gaussian weight vector `w(i) = h g_σ(uᵢ - p)`. -/
@@ -252,6 +252,7 @@ lemma rdiag_mul_rdiag (f g : ι → ℝ) : rdiag f * rdiag g = rdiag (f * g) := 
 omit [Fintype ι] in
 lemma rdiag_conjTranspose (f : ι → ℝ) : (rdiag f)ᴴ = rdiag f := (rdiag_isHermitian f).eq
 
+omit [Fintype ι] [DecidableEq ι] in
 lemma sq_mul_sq (hh : 0 ≤ Hd.h) {v : Fin 3} (hσ : 0 < σ v) :
     Hd.sqw p σ v * Hd.sqw p σ v = Hd.w p σ v := by
   funext i
@@ -467,11 +468,13 @@ def tr32 (η : ℝ) {κ : Type*} [Fintype κ] [DecidableEq κ] (Γ K : Matrix κ
 row weight of `T_v`:
 `∂_{p_v} e_v = (3/2) Re tr(√(T_v+η) U_v)`,
 `∂_{p_v}² e_v = V_v + (3/2) Re tr(√(T_v+η) ∂²_{p_v} T_v)` and
-`∂_{σ_v} e_v = (1/2) (3/2) Re tr(√(T_v+η) ∂²_{p_v} T_v)`; hence `2 ∂_{σ_v} e_v = ∂²_{p_v} e_v - V_v`. -/
+`∂_{σ_v} e_v = (1/2) (3/2) Re tr(√(T_v+η) ∂²_{p_v} T_v)`; hence `2 ∂_{σ_v} e_v = ∂²_{p_v} e_v -
+    V_v`. -/
 theorem e_heat_row (hh : 0 ≤ Hd.h) {η : ℝ} (hη : 0 < η) (hσ : ∀ k, 0 < σ k) (v : Fin 3) :
     HasDerivAt (fun q => Hd.e (Function.update p v q) σ η v)
       (tr32 η (Hd.T p σ v) (Hd.Ui p σ v)) (p v) ∧
-    HasDerivAt (fun q => tr32 η (Hd.T (Function.update p v q) σ v) (Hd.Ui (Function.update p v q) σ v))
+    HasDerivAt (fun q => tr32 η (Hd.T (Function.update p v q) σ v) (Hd.Ui (Function.update p v
+        q) σ v))
       (Hd.V p σ η v + tr32 η (Hd.T p σ v) (wGram (Hd.Brow p σ v) (Hd.ddw p σ v))) (p v) ∧
     HasDerivAt (fun τ => Hd.e p (Function.update σ v τ) η v)
       (tr32 η (Hd.T p σ v) (wGram (Hd.Brow p σ v) (fun i => Hd.ddw p σ v i / 2))) (σ v) := by
@@ -653,16 +656,23 @@ lemma fromBlocks_diag_eq (X Y : Matrix ι ι ℂ) :
     Matrix.fromBlocks X 0 0 Y = (ein1 : Matrix (ι ⊕ ι) ι ℂ) * X * (ein1 : Matrix (ι ⊕ ι) ι ℂ)ᴴ +
       (ein2 : Matrix (ι ⊕ ι) ι ℂ) * Y * (ein2 : Matrix (ι ⊕ ι) ι ℂ)ᴴ := by
   ext (a | a) (b | b) <;>
-    simp [ein1, ein2, Matrix.mul_apply, Matrix.conjTranspose_apply, Fintype.sum_sum_type,
-      Matrix.one_apply]
+    simp [ein1, ein2, Matrix.mul_apply, Matrix.conjTranspose_apply, Matrix.one_apply]
 
-lemma fromBlocks_diag_posSemidef {X Y : Matrix ι ι ℂ} (hX : X.PosSemidef) (hY : Y.PosSemidef) :
+omit [DecidableEq ι] [Fintype ι] in
+lemma fromBlocks_diag_posSemidef [Finite ι] {X Y : Matrix ι ι ℂ} (hX : X.PosSemidef) (hY :
+    Y.PosSemidef) :
     (Matrix.fromBlocks X 0 0 Y).PosSemidef := by
+  classical
+  let := Fintype.ofFinite ι
   rw [fromBlocks_diag_eq]
   exact (hX.mul_mul_conjTranspose_same _).add (hY.mul_mul_conjTranspose_same _)
 
-lemma sqrt_fromBlocks_diag {P Q : Matrix ι ι ℂ} (hP : P.PosSemidef) (hQ : Q.PosSemidef) :
+omit [DecidableEq ι] in
+lemma sqrt_fromBlocks_diag {ι : Type*} [Fintype ι] {P Q : Matrix ι ι ℂ}
+    (hP : P.PosSemidef) (hQ : Q.PosSemidef) :
+    open scoped Classical in
     CFC.sqrt (Matrix.fromBlocks P 0 0 Q) = Matrix.fromBlocks (CFC.sqrt P) 0 0 (CFC.sqrt Q) := by
+  classical
   have hsP : (CFC.sqrt P).PosSemidef := (CFC.sqrt_nonneg P).posSemidef
   have hsQ : (CFC.sqrt Q).PosSemidef := (CFC.sqrt_nonneg Q).posSemidef
   have hnn : 0 ≤ Matrix.fromBlocks (CFC.sqrt P) 0 0 (CFC.sqrt Q) :=
@@ -671,13 +681,16 @@ lemma sqrt_fromBlocks_diag {P Q : Matrix ι ι ℂ} (hP : P.PosSemidef) (hQ : Q.
   rw [Matrix.fromBlocks_multiply]
   simp [CFC.sqrt_mul_sqrt_self P hP.nonneg, CFC.sqrt_mul_sqrt_self Q hQ.nonneg]
 
+omit [DecidableEq ι] in
 lemma trace_fromBlocks' (a b c d : Matrix ι ι ℂ) :
     (Matrix.fromBlocks a b c d).trace = a.trace + d.trace := by
   simp [Matrix.trace, Fintype.sum_sum_type]
 
+omit [DecidableEq ι] in
 lemma costInt_fromBlocks_diag (A1 A2 K11 K12 K21 K22 X1 X2 : Matrix ι ι ℂ) :
     costInt (Matrix.fromBlocks A1 0 0 A2) (Matrix.fromBlocks K11 K12 K21 K22)
         (Matrix.fromBlocks X1 0 0 X2) = costInt A1 K11 X1 + costInt A2 K22 X2 := by
+  classical
   simp only [costInt, hsRe, Matrix.fromBlocks_conjTranspose, Matrix.fromBlocks_multiply,
     trace_fromBlocks']
   simp only [Matrix.mul_zero, Matrix.zero_mul, add_zero, zero_add, Matrix.conjTranspose_zero,
@@ -725,6 +738,7 @@ namespace HeatData
 
 variable (Hd : HeatData ι) (p σ : Fin 3 → ℝ)
 
+omit [Fintype ι] [DecidableEq ι] in
 lemma w_pos (hh : 0 < Hd.h) {v : Fin 3} (hσ : 0 < σ v) (i : ι) : 0 < Hd.w p σ v i := by
   simp only [w, gweight, gaussian]
   have : 0 < √(2 * π * σ v) := Real.sqrt_pos.2 (by positivity)
@@ -773,6 +787,7 @@ lemma S_eq_sum (v : Fin 3) :
 
 end HeatData
 
+omit [Fintype ι] [DecidableEq ι] in
 lemma fromBlocks_sub' (a b c d a' b' c' d' : Matrix ι ι ℂ) :
     Matrix.fromBlocks a b c d - Matrix.fromBlocks a' b' c' d' =
       Matrix.fromBlocks (a - a') (b - b') (c - c') (d - d') := by
@@ -825,7 +840,8 @@ theorem neighbor_cost_comparison (hh : 0 < Hd.h) {w : Fin 3} (hσ : 0 < σ w) {�
   rw [← hUi] at hdis
   -- compare with the column Grams
   have hS1 : Aᴴ * A + (η : ℂ) • 1 ≤ Hd.S p σ (w + 1) + (η : ℂ) • 1 := by
-    rw [Matrix.le_iff, Hd.S_eq_sum p σ (w + 1), show w + 1 - 1 = w by abel, add_sub_add_right_eq_sub]
+    rw [Matrix.le_iff, Hd.S_eq_sum p σ (w + 1), show w + 1 - 1 = w by abel,
+        add_sub_add_right_eq_sub]
     convert Matrix.posSemidef_self_mul_conjTranspose (Hd.W p σ (w + 1)) using 1
     exact add_sub_cancel_right _ _
   have hS2 : B * Bᴴ + (η : ℂ) • 1 ≤ Hd.S p σ (w - 1) + (η : ℂ) • 1 := by
@@ -919,7 +935,8 @@ lemma rdiag_mul_mul_rdiag_apply {κ : Type*} [Fintype κ] [DecidableEq κ] (d d'
 def dsq (k : Fin 3) (i : ι) : ℝ := (Hd.ddw p σ k i / 2) / (2 * Hd.sqw p σ k i)
 
 /-- The row part of the variance derivative of `T_v`. -/
-def Mrow (v : Fin 3) : Matrix (ι ⊕ ι) (ι ⊕ ι) ℂ := wGram (Hd.Brow p σ v) (fun i => Hd.ddw p σ v i / 2)
+def Mrow (v : Fin 3) : Matrix (ι ⊕ ι) (ι ⊕ ι) ℂ := wGram (Hd.Brow p σ v) (fun i => Hd.ddw p σ v
+    i / 2)
 
 /-- The part of the variance derivative of `T_v` coming from the column weight `w_{v+1}`. -/
 def Mnext (v : Fin 3) : Matrix (ι ⊕ ι) (ι ⊕ ι) ℂ :=
@@ -938,6 +955,7 @@ lemma Mrow_eq (v : Fin 3) :
   rw [Mrow, wGram, wGram, Brow, Dc_eq]
   simp only [Matrix.conjTranspose_mul, rdiag_conjTranspose, Matrix.mul_assoc]
 
+omit [Fintype ι] [DecidableEq ι] in
 /-- Derivative of a weight along a variance curve. -/
 lemma hasDerivAt_w_curve {c : ℝ → Fin 3 → ℝ} {c' : Fin 3 → ℝ} {θ₀ : ℝ}
     (hc : ∀ k, HasDerivAt (fun θ => c θ k) (c' k) θ₀) (hσ : ∀ k, 0 < c θ₀ k) (k : Fin 3)
@@ -946,10 +964,12 @@ lemma hasDerivAt_w_curve {c : ℝ → Fin 3 → ℝ} {c' : Fin 3 → ℝ} {θ₀
   have := (hasDerivAt_gweight_σ Hd.u Hd.h (p k) (hσ k) i).comp θ₀ (hc k)
   exact this.congr_deriv (by simp only [ddw_def]; ring)
 
+omit [DecidableEq ι] [Fintype ι] in
 lemma hasDerivAt_sqw_curve (hh : 0 < Hd.h) {c : ℝ → Fin 3 → ℝ} {c' : Fin 3 → ℝ} {θ₀ : ℝ}
     (hc : ∀ k, HasDerivAt (fun θ => c θ k) (c' k) θ₀) (hσ : ∀ k, 0 < c θ₀ k) (k : Fin 3)
     (i : ι) :
     HasDerivAt (fun θ => Hd.sqw p (c θ) k i) (c' k * Hd.dsq p (c θ₀) k i) θ₀ := by
+  classical
   have hpos : 0 < Hd.w p (c θ₀) k i := Hd.w_pos p (c θ₀) hh (hσ k) i
   have := (Hd.hasDerivAt_w_curve p hc hσ k i).sqrt hpos.ne'
   exact this.congr_deriv (by unfold HeatData.dsq HeatData.sqw; ring)
@@ -994,7 +1014,7 @@ theorem hasDerivAt_e_curve (hh : 0 < Hd.h) {η : ℝ} (hη : 0 < η) {c : ℝ �
     simp only [P', Matrix.add_apply, Matrix.smul_apply, smul_eq_mul, Mrow_eq, Mnext, Mprev,
       rdiag_mul_mul_rdiag_apply, hw2, wGram_smul]
     rcases a with a | a <;> rcases b with b | b <;>
-      simp [dv] <;> push_cast <;> ring
+      simp [dv] <;> ring
   have hE := hasDerivAt_energyReg hη hT hd
   refine hE.congr_deriv ?_
   change tr32 η (Hd.T p σ₀ v) P' = _
@@ -1091,7 +1111,9 @@ omit [DecidableEq n] in
 lemma sqrt_hsSq_neg (X : Matrix n n ℂ) : hsSq (-X) = hsSq X := by
   simp [hsSq]
 
+omit [DecidableEq n] in
 lemma sqrt_hsSq_mul_le (X Y : Matrix n n ℂ) : √(hsSq (X * Y)) ≤ √(hsSq X) * √(hsSq Y) := by
+  classical
   rw [← Real.sqrt_mul (hsSq_nonneg X)]
   exact Real.sqrt_le_sqrt (hsSq_mul_le X Y)
 
@@ -1209,11 +1231,13 @@ lemma ContinuousOn.sylvSol {Z : Type*} [TopologicalSpace Z] {A Y : Z → Matrix 
   filter_upwards [self_mem_nhdsWithin] with a ha
   exact sqrt_hsSq_sylvSol_sub_le hc (hpos a ha) (hpos z hz) _ _
 
+omit [DecidableEq n] in
 /-- Completing the square in the variational formula: if `A` is Hermitian and
 `A X₀ + X₀ A = K`, then `costInt A K X = Re⟨K, X₀⟩ - Re⟨D, AD + DA⟩` with `D = X - X₀`. -/
 lemma costInt_eq_complete {A K X₀ : Matrix n n ℂ} (hA : A.IsHermitian)
     (hK : A * X₀ + X₀ * A = K) (X : Matrix n n ℂ) :
     costInt A K X = hsRe K X₀ - hsRe (X - X₀) (A * (X - X₀) + (X - X₀) * A) := by
+  classical
   have hsym : ∀ U W : Matrix n n ℂ, hsRe U (A * W + W * A) = hsRe (A * U + U * A) W := by
     intro U W
     rw [hsRe_add_right, hsRe_mul_left_adj hA, hsRe_mul_right_adj hA, hsRe_comm (A * U) W,
@@ -1345,10 +1369,11 @@ lemma edec_sq {b : ℝ} (x : ℝ) : edec b x ^ 2 = Real.exp (-(x ^ 2) / (8 * b))
   rw [edec, sq, ← Real.exp_add]; congr 1; ring
 
 /-- Node-uniform Gaussian bound: `|g_σ^{(j)}(uᵢ - q)| ≤ C e^{-q²/(8σ_b)}`. -/
-lemma abs_gaussianD_nodes_le {ι : Type*} [Fintype ι] (u : ι → ℝ) (j : ℕ) {σa σb : ℝ}
+lemma abs_gaussianD_nodes_le {ι : Type*} [Finite ι] (u : ι → ℝ) (j : ℕ) {σa σb : ℝ}
     (ha : 0 < σa) (hab : σa ≤ σb) :
     ∃ C : ℝ, 0 ≤ C ∧ ∀ σ ∈ Set.Icc σa σb, ∀ q i,
       |gaussianD j σ (u i - q)| ≤ C * edec σb q ^ 2 := by
+  let := Fintype.ofFinite ι
   obtain ⟨C, hC, h⟩ := abs_gaussianD_le_unif j (σb := σb) ha
   have hb : 0 < σb := ha.trans_le hab
   refine ⟨C * ∑ i, Real.exp (u i ^ 2 / (4 * σb)), by positivity, fun σ hσ q i => ?_⟩
@@ -1368,7 +1393,7 @@ section HeatBounds
 
 variable {ι : Type*} [Fintype ι] [DecidableEq ι]
 
-lemma norm_wGram_le {κ : Type*} [Fintype κ] (B : Matrix ι κ ℂ) (f : ι → ℝ) {β γ : ℝ}
+lemma norm_wGram_le {κ : Type*} (B : Matrix ι κ ℂ) (f : ι → ℝ) {β γ : ℝ}
     (hB : ∀ i a, ‖B i a‖ ≤ β) (hf : ∀ i, |f i| ≤ γ) (a b : κ) :
     ‖wGram B f a b‖ ≤ Fintype.card ι * (β * γ * β) := by
   rw [wGram_apply]
@@ -1420,9 +1445,9 @@ lemma phi_nonneg (b : ℝ) (v : Fin 3) (p : Fin 3 → ℝ) : 0 ≤ phi b v p := 
   unfold phi; have := edec_pos b (p v); have := edec_pos b (p (v + 1))
   have := edec_pos b (p (v - 1)); positivity
 
-omit [DecidableEq ι] in
+omit [DecidableEq ι] [Fintype ι] in
 /-- Bounds for the weights and their center derivatives. -/
-lemma weight_bounds (hh : 0 ≤ Hd.h) {σa σb : ℝ} (ha : 0 < σa) (hab : σa ≤ σb) :
+lemma weight_bounds [Finite ι] (hh : 0 ≤ Hd.h) {σa σb : ℝ} (ha : 0 < σa) (hab : σa ≤ σb) :
     ∃ C : ℝ, 0 ≤ C ∧ ∀ p σ : Fin 3 → ℝ, (∀ k, σ k ∈ Set.Icc σa σb) → ∀ k i,
       |Hd.w p σ k i| ≤ C * edec σb (p k) ^ 2 ∧ |Hd.dw p σ k i| ≤ C * edec σb (p k) ^ 2 ∧
       |Hd.ddw p σ k i| ≤ C * edec σb (p k) ^ 2 ∧ Hd.sqw p σ k i ≤ √C * edec σb (p k) := by
@@ -1601,7 +1626,10 @@ lemma re_trace_le_of_entry_le (Γ : Matrix κ κ ℂ) {c : ℝ} (h : ∀ a b, �
         Finset.sum_le_sum fun a _ => (Complex.re_le_norm _).trans (h a a)
     _ = _ := by simp
 
-lemma hsSq_sqrt_eq {P : Matrix κ κ ℂ} (hP : 0 ≤ P) : hsSq (CFC.sqrt P) = P.trace.re := by
+omit [DecidableEq κ] in
+lemma hsSq_sqrt_eq {κ : Type*} [Fintype κ] {P : Matrix κ κ ℂ} (hP : 0 ≤ P) :
+    open scoped Classical in hsSq (CFC.sqrt P) = P.trace.re := by
+  classical
   rw [← hsRe_self, hsRe, (CFC.sqrt_nonneg P).posSemidef.isHermitian.eq,
     CFC.sqrt_mul_sqrt_self P hP]
 
@@ -1768,8 +1796,10 @@ theorem scalar_bounds (hh : 0 ≤ Hd.h) {η : ℝ} (hη : 0 < η) {σa σb : ℝ
   obtain ⟨C₀, hC₀, hent⟩ := Hd.entry_bounds hh ha hab
   have hb : 0 < σb := ha.trans_le hab
   set N : ℝ := Fintype.card (ι ⊕ ι) + Fintype.card ι
-  have hN1 : (Fintype.card (ι ⊕ ι) : ℝ) ≤ N := by simp only [N]; linarith [Nat.cast_nonneg (α := ℝ) (Fintype.card ι)]
-  have hN2 : (Fintype.card ι : ℝ) ≤ N := by simp only [N]; linarith [Nat.cast_nonneg (α := ℝ) (Fintype.card (ι ⊕ ι))]
+  have hN1 : (Fintype.card (ι ⊕ ι) : ℝ) ≤ N := by
+    simp only [N]; linarith [Nat.cast_nonneg (α := ℝ) (Fintype.card ι)]
+  have hN2 : (Fintype.card ι : ℝ) ≤ N := by
+    simp only [N]; linarith [Nat.cast_nonneg (α := ℝ) (Fintype.card (ι ⊕ ι))]
   set A1 := (3 / 2) * √(N * (4 * C₀) + N * η) * N * C₀
   set A2 := (3 / 4) * N ^ 2 * (4 * C₀) * C₀ / √η
   set A3 := 2 * N * C₀ * √(N * (4 * C₀) + η)
@@ -1845,10 +1875,10 @@ lemma continuous_rdiag {f : X → ι → ℝ} (hf : ∀ i, Continuous fun x => f
     Continuous fun x => rdiag (f x) :=
   Continuous.matrix_diagonal (continuous_pi fun i => Complex.continuous_ofReal.comp (hf i))
 
-lemma continuous_wGram {κ : Type*} [Fintype κ] {B : X → Matrix ι κ ℂ} {f : X → ι → ℝ}
+lemma continuous_wGram {κ : Type*} {B : X → Matrix ι κ ℂ} {f : X → ι → ℝ}
     (hB : Continuous B) (hf : ∀ i, Continuous fun x => f x i) :
-    Continuous fun x => wGram (B x) (f x) :=
-  (hB.matrix_conjTranspose.matrix_mul (continuous_rdiag hf)).matrix_mul hB
+    Continuous fun x => wGram (B x) (f x) := by
+  exact (hB.matrix_conjTranspose.matrix_mul (continuous_rdiag hf)).matrix_mul hB
 
 omit [Fintype ι] [DecidableEq ι] in
 lemma continuous_re_trace {κ : Type*} [Fintype κ] {M : X → Matrix κ κ ℂ} (hM : Continuous M) :
@@ -2023,7 +2053,7 @@ lemma integrable_gdom {ε : ℝ} (hε : 0 < ε) : Integrable (gdom ε) :=
     fun _ => integrable_exp_neg_mul_sq hε
 
 lemma continuous_gdom (ε : ℝ) : Continuous (gdom ε) :=
-  continuous_finset_prod _ fun k _ => Real.continuous_exp.comp
+  continuous_finsetProd _ fun k _ => Real.continuous_exp.comp
     (continuous_const.mul ((continuous_apply k).pow 2))
 
 lemma exp_pair_le (a b c : ℝ) {x y : ℝ} (hx : 0 < x) (hy : 0 < y) :
@@ -2080,11 +2110,13 @@ lemma phi_sq_mul_exp_le {σb τb : ℝ} (hσ : 0 < σb) (hτ : 0 < τb) (v : Fin
   have t1 : (E0 * E1) ^ 2 * Real.exp (-(p 0 + p 1 + p 2) ^ 2 / (4 * τb)) ≤ gdom ε p := by
     rw [mul_pow, hE, hE, ← Real.exp_add, hG, gdom_eq, hs1, hq1]
     have := exp_pair_le (p v) (p (v + 1)) (p (v - 1)) hx hy
-    convert this using 2 <;> ring
+    convert this using 2
+    ring_nf
   have t2 : (E0 * E2) ^ 2 * Real.exp (-(p 0 + p 1 + p 2) ^ 2 / (4 * τb)) ≤ gdom ε p := by
     rw [mul_pow, hE, hE, ← Real.exp_add, hG, gdom_eq, hs2, hq2]
     have := exp_pair_le (p v) (p (v - 1)) (p (v + 1)) hx hy
-    convert this using 2 <;> ring
+    convert this using 2
+    ring_nf
   have hphi : HeatData.phi σb v p ^ 2 ≤ 2 * (E0 * E1) ^ 2 + 2 * (E0 * E2) ^ 2 := by
     simp only [HeatData.phi, E0, E1, E2]
     nlinarith [sq_nonneg (edec σb (p v) * edec σb (p (v + 1)) -
@@ -2152,7 +2184,8 @@ lemma hasDerivAt_Gm_coord (β : ℝ) (m : ℕ) (s : ℝ) (i : Fin 3) (p : Fin 3 
   have hin : HasDerivAt (fun x => Function.update p i x 0 + Function.update p i x 1 +
       Function.update p i x 2) 1 (p i) := by
     have := ((HeatData.hasDerivAt_update_coord p i 0 (p i)).add
-      (HeatData.hasDerivAt_update_coord p i 1 (p i))).add (HeatData.hasDerivAt_update_coord p i 2 (p i))
+      (HeatData.hasDerivAt_update_coord p i 1 (p i))).add (HeatData.hasDerivAt_update_coord p i
+          2 (p i))
     convert this using 1
     have : i = 0 ∨ i = 1 ∨ i = 2 := by fin_cases i <;> simp
     rcases this with rfl | rfl | rfl <;> simp
@@ -2174,7 +2207,10 @@ lemma good_integrable {Q : ℝ × (Fin 3 → ℝ) → ℝ} {sa sb σb β : ℝ} 
     Integrable (fun z : ℝ × (Fin 3 → ℝ) => Gm β m z.1 z.2 * Q z)
       ((volume.restrict (Set.Ioc sa sb)).prod volume) := by
   obtain ⟨CQ, hCQ⟩ := hb
-  have hsb : 0 < sb ∨ sb < sa := by rcases lt_or_ge 0 sb with h | h; exact Or.inl h; right; linarith
+  have hsb : 0 < sb ∨ sb < sa := by
+    rcases lt_or_ge 0 sb with h | h
+    · exact Or.inl h
+    · right; linarith
   rcases hsb with hsb | hsb
   swap
   · refine ⟨fun s hs => absurd (hs.1.trans hs.2) (not_le.2 hsb), ?_⟩
@@ -2238,7 +2274,8 @@ theorem continuousOn_family (hα : ∀ k, 0 < α k) {η : ℝ} (hη : 0 < η) (v
     ContinuousOn (fun z : ℝ × (Fin 3 → ℝ) => Hd.Yprev z.2 (sig α z.1) η v) S ∧
     ContinuousOn (fun z : ℝ × (Fin 3 → ℝ) => Hd.Z z.2 (sig α z.1) η v) S := by
   intro S
-  have hp : Continuous fun x : S => (x : ℝ × (Fin 3 → ℝ)).2 := continuous_snd.comp continuous_subtype_val
+  have hp : Continuous fun x : S => (x : ℝ × (Fin 3 → ℝ)).2 := continuous_snd.comp
+      continuous_subtype_val
   have hσ : Continuous fun x : S => sig α (x : ℝ × (Fin 3 → ℝ)).1 :=
     continuous_pi fun k => continuous_const.mul (continuous_fst.comp continuous_subtype_val)
   have hpos : ∀ (x : S) k, 0 < sig α (x : ℝ × (Fin 3 → ℝ)).1 k := fun x k =>
@@ -2774,7 +2811,7 @@ theorem sum_gweight_le {ι : Type*} [Fintype ι] (u : ι → ℝ) {h σ : ℝ} (
       rw [abs_of_neg (by linarith [ht.2]), abs_of_neg (by linarith)]; linarith [ht.1]
   have hdisj : Set.Pairwise (↑far) (Function.onFun Disjoint I) := by
     intro i hi j hj hij
-    simp only [far, Finset.coe_filter, Finset.mem_univ, true_and, Set.mem_setOf_eq] at hi hj
+    simp only [far, Finset.coe_filter, Finset.mem_univ, true_and, Set.mem_ofPred_eq] at hi hj
     have hs := hsep i j hij
     refine Set.disjoint_left.2 fun t hti htj => ?_
     simp only [I] at hti htj
@@ -2882,7 +2919,7 @@ lemma plane_integral_prod01 {k f g : ℝ → ℝ} (hk : Continuous k) (hf : Cont
   have hF' : Integrable F' ((volume : Measure ℝ).prod volume) := by
     rw [integrable_prod_iff' hF'c.aestronglyMeasurable]
     refine ⟨Eventually.of_forall fun q => ?_, ?_⟩
-    · show Integrable (fun x => k (q 0 + q 1 + x) * (f (q 0) * g (q 1)))
+    · change Integrable (fun x => k (q 0 + q 1 + x) * (f (q 0) * g (q 1)))
       exact (hki.comp_add_left (q 0 + q 1)).mul_const (f (q 0) * g (q 1))
     · have : (fun q : Fin 2 → ℝ => ∫ x, ‖F' (x, q)‖) =
           fun q => (∫ t, |k t|) * (|f (q 0)| * |g (q 1)|) := by
@@ -3070,6 +3107,7 @@ namespace HeatData
 
 variable (Hd : HeatData ι)
 
+omit [Fintype ι] [DecidableEq ι] in
 /-- The plane integral of one edge density: `∫ g_{βs}(p₀+p₁+p₂) w_v(i) w_{v+1}(j) dp = h²`. -/
 lemma plane_integral_weights (α : Fin 3 → ℝ) (hα : ∀ k, 0 < α k) {β s : ℝ} (hβ : 0 < β)
     (hs : 0 < s) (v : Fin 3) (i j : ι) :

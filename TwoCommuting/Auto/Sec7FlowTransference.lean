@@ -147,7 +147,8 @@ lemma memLp_orbitFun (hC : CommutingFlows ν U V) {f : Ω → ℂ} (hf : Measura
     (Or.inr (volume_flowSq_ne_top R))) (measurable_orbitFun hC hf R ω).aestronglyMeasurable
     (Eventually.of_forall fun x => ?_)
   by_cases hx : x ∈ flowSq R
-  · simp only [orbitFun, hx, ↓reduceIte, Set.indicator_of_mem hx, Real.norm_eq_abs, abs_of_nonneg hB0]
+  · simp only [orbitFun, hx, ↓reduceIte, Set.indicator_of_mem hx, Real.norm_eq_abs,
+      abs_of_nonneg hB0]
     exact hB _
   · simp [orbitFun, hx]
 
@@ -373,7 +374,8 @@ lemma lintegral_cs_three_halves {X : Type*} [MeasurableSpace X] {μ : Measure X}
   have hsq : ∀ c : ℝ≥0∞, (V * c ^ (3 : ℝ)) ^ (1 / 2 : ℝ) = V ^ (1 / 2 : ℝ) * c ^ (3 / 2 : ℝ) := by
     intro c; rw [ENNReal.mul_rpow_of_nonneg _ _ (by norm_num), ← ENNReal.rpow_mul]; norm_num
   calc A ^ (3 / 2 : ℝ) * ∫⁻ x, a x ^ (3 / 2 : ℝ) * b x ^ (3 / 2 : ℝ) ∂μ
-      ≤ A ^ (3 / 2 : ℝ) * ((V * na ^ (3 : ℝ)) ^ (1 / 2 : ℝ) * (V * nb ^ (3 : ℝ)) ^ (1 / 2 : ℝ)) := by
+      ≤ A ^ (3 / 2 : ℝ) * ((V * na ^ (3 : ℝ)) ^ (1 / 2 : ℝ) * (V * nb ^ (3 : ℝ)) ^ (1 / 2 : ℝ))
+          := by
         gcongr
     _ = A ^ (3 / 2 : ℝ) * na ^ (3 / 2 : ℝ) * nb ^ (3 / 2 : ℝ) *
           (V ^ (1 / 2 : ℝ) * V ^ (1 / 2 : ℝ)) := by rw [hsq, hsq]; ring

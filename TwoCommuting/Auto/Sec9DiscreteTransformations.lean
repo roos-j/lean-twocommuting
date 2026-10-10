@@ -128,25 +128,25 @@ theorem measurePreserving_zpowMap {μ : Measure X} {T Tinv : X → X}
 
 /-- Rotation by `t` modulo one preserves Lebesgue measure on `[0,1)`, in integrated form. -/
 theorem lintegral_Ico_fract_add (g : ℝ → ℝ≥0∞) (t : ℝ) :
-    ∫⁻ u in Ico (0:ℝ) 1, g (Int.fract (u + t)) = ∫⁻ u in Ico (0:ℝ) 1, g u := by
+    ∫⁻ u in Ico (0 : ℝ) 1, g (Int.fract (u + t)) = ∫⁻ u in Ico (0 : ℝ) 1, g u := by
   have hIco : ∀ a : ℝ, volume.restrict (Ico a (a + 1)) = volume.restrict (Ioc a (a + 1)) :=
     fun a => Measure.restrict_congr_set Ico_ae_eq_Ioc
-  have h1 : ∫⁻ u in Ioc (0:ℝ) (0 + 1), g (Int.fract (u + t)) =
+  have h1 : ∫⁻ u in Ioc (0 : ℝ) (0 + 1), g (Int.fract (u + t)) =
       ∫⁻ w in Ioc t (t + 1), g (Int.fract w) := by
-    have hpre : (fun x : ℝ => x + t) ⁻¹' Ioc t (t + 1) = Ioc (0:ℝ) (0 + 1) := by
+    have hpre : (fun x : ℝ => x + t) ⁻¹' Ioc t (t + 1) = Ioc (0 : ℝ) (0 + 1) := by
       rw [preimage_add_const_Ioc]; congr 1 <;> ring
     rw [← hpre]
     exact (measurePreserving_add_right volume t).setLIntegral_comp_preimage_emb
       (measurableEmbedding_addRight t) (fun w => g (Int.fract w)) _
   have h2 : ∫⁻ w in Ioc t (t + 1), g (Int.fract w) =
-      ∫⁻ w in Ioc (0:ℝ) (0 + 1), g (Int.fract w) := by
+      ∫⁻ w in Ioc (0 : ℝ) (0 + 1), g (Int.fract w) := by
     refine (isAddFundamentalDomain_Ioc one_pos t).setLIntegral_eq
       (isAddFundamentalDomain_Ioc one_pos 0) _ ?_
     rintro ⟨n, hn⟩ x
     obtain ⟨k, rfl⟩ := AddSubgroup.mem_zmultiples_iff.1 hn
-    show g (Int.fract ((k • (1:ℝ)) + x)) = g (Int.fract x)
+    change g (Int.fract ((k • (1:ℝ)) + x)) = g (Int.fract x)
     simp
-  have h3 : ∫⁻ w in Ico (0:ℝ) 1, g (Int.fract w) = ∫⁻ w in Ico (0:ℝ) 1, g w :=
+  have h3 : ∫⁻ w in Ico (0 : ℝ) 1, g (Int.fract w) = ∫⁻ w in Ico (0 : ℝ) 1, g w :=
     setLIntegral_congr_fun measurableSet_Ico (fun w hw => by rw [Int.fract_eq_self.2 hw])
   have e0 := hIco 0
   rw [zero_add] at e0
@@ -154,8 +154,8 @@ theorem lintegral_Ico_fract_add (g : ℝ → ℝ≥0∞) (t : ℝ) :
 
 /-- The rotation `u ↦ {u + t}` preserves Lebesgue measure restricted to `[0,1)`. -/
 theorem measurePreserving_fract_add (t : ℝ) :
-    MeasurePreserving (fun u : ℝ => Int.fract (u + t)) (volume.restrict (Ico (0:ℝ) 1))
-      (volume.restrict (Ico (0:ℝ) 1)) := by
+    MeasurePreserving (fun u : ℝ => Int.fract (u + t)) (volume.restrict (Ico (0 : ℝ) 1))
+      (volume.restrict (Ico (0 : ℝ) 1)) := by
   have hm : Measurable (fun u : ℝ => Int.fract (u + t)) := (measurable_add_const t).fract
   refine ⟨hm, ?_⟩
   ext B hB
@@ -174,7 +174,7 @@ theorem measurePreserving_fiberwise {Y : Type*} [MeasurableSpace Y] {μ : Measur
   exact (Measure.measurePreserving_swap).comp (h.comp Measure.measurePreserving_swap)
 
 /-- Lebesgue measure restricted to `[0,1)`. -/
-abbrev unitIcoMeasure : Measure ℝ := volume.restrict (Ico (0:ℝ) 1)
+abbrev unitIcoMeasure : Measure ℝ := volume.restrict (Ico (0 : ℝ) 1)
 
 instance : IsProbabilityMeasure unitIcoMeasure := ⟨by simp⟩
 
@@ -224,14 +224,14 @@ theorem suspFlowSecond_add (S Sinv : X → X) (hl : Function.LeftInverse Sinv S)
   rw [← zpowMap_add S Sinv hl hr, floor_fract_add_add_floor, fract_fract_add, e]
 
 omit [MeasurableSpace X] in
-theorem suspFlowFirst_zero (T Tinv : X → X) (ω : X × ℝ × ℝ) (hu : ω.2.1 ∈ Ico (0:ℝ) 1) :
+theorem suspFlowFirst_zero (T Tinv : X → X) (ω : X × ℝ × ℝ) (hu : ω.2.1 ∈ Ico (0 : ℝ) 1) :
     suspFlowFirst T Tinv 0 ω = ω := by
   obtain ⟨x, u, v⟩ := ω
   simp only [suspFlowFirst, add_zero, Int.floor_eq_zero_iff.2 hu, Int.fract_eq_self.2 hu]
   rfl
 
 omit [MeasurableSpace X] in
-theorem suspFlowSecond_zero (S Sinv : X → X) (ω : X × ℝ × ℝ) (hv : ω.2.2 ∈ Ico (0:ℝ) 1) :
+theorem suspFlowSecond_zero (S Sinv : X → X) (ω : X × ℝ × ℝ) (hv : ω.2.2 ∈ Ico (0 : ℝ) 1) :
     suspFlowSecond S Sinv 0 ω = ω := by
   obtain ⟨x, u, v⟩ := ω
   simp only [suspFlowSecond, add_zero, Int.floor_eq_zero_iff.2 hv, Int.fract_eq_self.2 hv]
@@ -296,10 +296,10 @@ theorem measurePreserving_suspFlowSecond {μ : Measure X} [SFinite μ] {S Sinv :
     _ hφm (fun p => measurePreserving_zpowMap hS hSinv hl _) hψ
 
 theorem ae_suspension_mem_Ico (μ : Measure X) [SFinite μ] :
-    ∀ᵐ ω ∂suspensionMeasure μ, ω.2.1 ∈ Ico (0:ℝ) 1 ∧ ω.2.2 ∈ Ico (0:ℝ) 1 := by
-  have h0 : ∀ᵐ u ∂unitIcoMeasure, u ∈ Ico (0:ℝ) 1 := ae_restrict_mem measurableSet_Ico
+    ∀ᵐ ω ∂suspensionMeasure μ, ω.2.1 ∈ Ico (0 : ℝ) 1 ∧ ω.2.2 ∈ Ico (0 : ℝ) 1 := by
+  have h0 : ∀ᵐ u ∂unitIcoMeasure, u ∈ Ico (0 : ℝ) 1 := ae_restrict_mem measurableSet_Ico
   have h1 : ∀ᵐ p ∂(unitIcoMeasure.prod unitIcoMeasure),
-      p.1 ∈ Ico (0:ℝ) 1 ∧ p.2 ∈ Ico (0:ℝ) 1 :=
+      p.1 ∈ Ico (0 : ℝ) 1 ∧ p.2 ∈ Ico (0 : ℝ) 1 :=
     (Measure.quasiMeasurePreserving_fst.ae h0).and (Measure.quasiMeasurePreserving_snd.ae h0)
   exact Measure.quasiMeasurePreserving_snd.ae h1
 
@@ -319,13 +319,13 @@ theorem two_coordinate_suspension_flows (μ : Measure X) [IsProbabilityMeasure �
     (hlS : Function.LeftInverse Sinv S) (hrS : Function.RightInverse Sinv S)
     (hTS : T ∘ S = S ∘ T) :
     IsProbabilityMeasure (suspensionMeasure μ) ∧
-    (∀ᵐ ω ∂suspensionMeasure μ, ω.2.1 ∈ Ico (0:ℝ) 1 ∧ ω.2.2 ∈ Ico (0:ℝ) 1) ∧
+    (∀ᵐ ω ∂suspensionMeasure μ, ω.2.1 ∈ Ico (0 : ℝ) 1 ∧ ω.2.2 ∈ Ico (0 : ℝ) 1) ∧
     (∀ (t s : ℝ) (ω : X × ℝ × ℝ),
       suspFlowFirst T Tinv (t + s) ω = suspFlowFirst T Tinv t (suspFlowFirst T Tinv s ω)) ∧
     (∀ (t s : ℝ) (ω : X × ℝ × ℝ),
       suspFlowSecond S Sinv (t + s) ω = suspFlowSecond S Sinv t (suspFlowSecond S Sinv s ω)) ∧
-    (∀ ω : X × ℝ × ℝ, ω.2.1 ∈ Ico (0:ℝ) 1 → suspFlowFirst T Tinv 0 ω = ω) ∧
-    (∀ ω : X × ℝ × ℝ, ω.2.2 ∈ Ico (0:ℝ) 1 → suspFlowSecond S Sinv 0 ω = ω) ∧
+    (∀ ω : X × ℝ × ℝ, ω.2.1 ∈ Ico (0 : ℝ) 1 → suspFlowFirst T Tinv 0 ω = ω) ∧
+    (∀ ω : X × ℝ × ℝ, ω.2.2 ∈ Ico (0 : ℝ) 1 → suspFlowSecond S Sinv 0 ω = ω) ∧
     (∀ (t s : ℝ) (ω : X × ℝ × ℝ),
       suspFlowFirst T Tinv t (suspFlowSecond S Sinv s ω) =
         suspFlowSecond S Sinv s (suspFlowFirst T Tinv t ω)) ∧
@@ -552,7 +552,8 @@ def natExtHomeomorph {R : E → E} (a b : E → E) (ha : Continuous a) (hb : Con
   continuous_toFun :=
     ((continuous_coordMap ha).comp continuous_subtype_val).subtype_mk _
   continuous_invFun :=
-    (continuous_pi fun k => hb.comp ((continuous_apply (k + 1)).comp continuous_subtype_val)).subtype_mk _
+    (continuous_pi fun k => hb.comp ((continuous_apply (k + 1)).comp
+        continuous_subtype_val)).subtype_mk _
 
 theorem natExtHomeomorph_val {R : E → E} (a b : E → E) (ha : Continuous a) (hb : Continuous b)
     (hab : ∀ y, a (b y) = R y) (hba : ∀ y, b (a y) = R y) :
@@ -592,7 +593,7 @@ theorem exists_natExt_measure (ν : Measure E) [IsProbabilityMeasure ν] (τ σ 
       (isClosed_eq (ProbabilityMeasure.continuous_map (continuous_coordMap hac)) continuous_id)
       (Eventually.of_forall fun k => ?_)
     apply Subtype.ext
-    show Measure.map (coordMap a) (Measure.map (histEmbed R k) ν) = Measure.map (histEmbed R k) ν
+    change Measure.map (coordMap a) (Measure.map (histEmbed R k) ν) = Measure.map (histEmbed R k) ν
     rw [Measure.map_map (continuous_coordMap hac).measurable (hsm k),
       coordMap_comp_histEmbed haR, ← Measure.map_map (hsm k) ha.measurable, ha.map_eq]
   have h0 : P.map (fun x => x 0) = ν' := by
@@ -600,7 +601,7 @@ theorem exists_natExt_measure (ν : Measure E) [IsProbabilityMeasure ν] (τ σ 
       (isClosed_eq (ProbabilityMeasure.continuous_map (continuous_apply 0)) continuous_const)
       (Eventually.of_forall fun k => ?_)
     apply Subtype.ext
-    show Measure.map (fun x : ℕ → E => x 0) (Measure.map (histEmbed R k) ν) = ν
+    change Measure.map (fun x : ℕ → E => x 0) (Measure.map (histEmbed R k) ν) = ν
     rw [Measure.map_map (continuous_apply 0).measurable (hsm k), eval_zero_comp_histEmbed,
       (hR.iterate k).map_eq]
   have hpair : ∀ j, P.map (pairMap j) = ν'.map (fun z => (z, R z)) := by
@@ -609,7 +610,7 @@ theorem exists_natExt_measure (ν : Measure E) [IsProbabilityMeasure ν] (τ σ 
       (isClosed_eq (ProbabilityMeasure.continuous_map (continuous_pairMap j)) continuous_const)
       ((eventually_gt_atTop j).mono fun k hk => ?_)
     apply Subtype.ext
-    show Measure.map (pairMap j) (Measure.map (histEmbed R k) ν) =
+    change Measure.map (pairMap j) (Measure.map (histEmbed R k) ν) =
       Measure.map (fun z => (z, R z)) ν
     rw [Measure.map_map (continuous_pairMap j).measurable (hsm k), pairMap_comp_histEmbed R hk,
       ← Measure.map_map (show Measurable (fun y : E => (y, R y)) from
@@ -650,7 +651,8 @@ theorem commuting_compact_natural_extension {E : Type u} [TopologicalSpace E] [C
     ∃ (Ehat : Type u) (_ : TopologicalSpace Ehat) (_ : MeasurableSpace Ehat),
       CompactSpace Ehat ∧ TopologicalSpace.MetrizableSpace Ehat ∧ BorelSpace Ehat ∧
       ∃ (νhat : Measure Ehat) (τhat σhat : Ehat ≃ₜ Ehat) (π₀ : Ehat → E),
-        IsProbabilityMeasure νhat ∧ MeasurePreserving τhat νhat νhat ∧ MeasurePreserving σhat νhat νhat ∧
+        IsProbabilityMeasure νhat ∧ MeasurePreserving τhat νhat νhat ∧ MeasurePreserving σhat
+            νhat νhat ∧
         ⇑τhat ∘ ⇑σhat = ⇑σhat ∘ ⇑τhat ∧ Continuous π₀ ∧ MeasurePreserving π₀ νhat ν ∧
         π₀ ∘ τhat = τ ∘ π₀ ∧ π₀ ∘ σhat = σ ∘ π₀ := by
   obtain ⟨P, hPprob, hPτ, hPσ, hP0, hPpair⟩ := exists_natExt_measure ν τ σ hτc hσc hτ hσ hc
@@ -687,7 +689,7 @@ theorem commuting_compact_natural_extension {E : Type u} [TopologicalSpace E] [C
     hpres σ τ hσc hτc hστ hτσ hPσ, ?_, hπ₀c, ⟨hπ₀c.measurable, ?_⟩, rfl, rfl⟩
   · funext x
     apply Subtype.ext; funext k
-    show τ (σ (x.1 k)) = σ (τ (x.1 k))
+    change τ (σ (x.1 k)) = σ (τ (x.1 k))
     exact congrFun hc _
   · have : (fun x : natExtSet R => x.1 0) = (fun x : ℕ → E => x 0) ∘ Subtype.val := rfl
     rw [this, ← Measure.map_map (continuous_apply 0).measurable hemb.measurable, hmapval, hP0]
@@ -713,7 +715,7 @@ theorem norm_bilinAvg_le (T S : X → X) {f g : X → ℂ} {Cf Cg : ℝ} (hf : �
   have hCf : 0 ≤ Cf := (norm_nonneg _).trans (hf x)
   have hCg : 0 ≤ Cg := (norm_nonneg _).trans (hg x)
   rcases Nat.eq_zero_or_pos N with rfl | hN
-  · simp [bilinAvg]; positivity
+  · simpa [bilinAvg] using mul_nonneg hCf hCg
   have hsum : ‖∑ n ∈ Finset.range N, f (T^[n] x) * g (S^[n] x)‖ ≤ N * (Cf * Cg) := by
     calc ‖∑ n ∈ Finset.range N, f (T^[n] x) * g (S^[n] x)‖
         ≤ ∑ n ∈ Finset.range N, ‖f (T^[n] x) * g (S^[n] x)‖ := norm_sum_le _ _
@@ -940,7 +942,8 @@ lemma integral_susp_T02 (T Tinv S Sinv : X → X) (f g : X → ℂ) (x : X) {u v
     ∫ t in (0 : ℝ)..N, liftFirstT02 f (suspFlowFirst T Tinv t (x, u, v)) *
         liftSecondT02 g (suspFlowSecond S Sinv t (x, u, v)) =
       ((1 / 4 - |u - v| : ℝ) : ℂ) * ∑ n ∈ Finset.range N, f (T^[n] x) * g (S^[n] x) := by
-  have h := intervalIntegral.sum_integral_adjacent_intervals (μ := volume) (a := fun k : ℕ => (k : ℝ))
+  have h := intervalIntegral.sum_integral_adjacent_intervals (μ := volume)
+    (a := fun k : ℕ => (k : ℝ))
     (n := N) (f := fun t => liftFirstT02 f (suspFlowFirst T Tinv t (x, u, v)) *
         liftSecondT02 g (suspFlowSecond S Sinv t (x, u, v)))
     (fun k _ => by

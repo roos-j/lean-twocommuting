@@ -129,7 +129,8 @@ theorem FinSupp.weak_maxZ (ha : FinSupp a S) {t : ℝ} (ht : 0 < t) (F : Finset 
     have : r k ≤ 2 * r b := by exact_mod_cast this
     constructor <;> omega
   have hcard : (F'.card : ℝ) ≤ ∑ b ∈ U, 5 * (2 * (r b : ℝ) + 1) := by
-    calc (F'.card : ℝ) ≤ ((U.biUnion fun b => Finset.Icc (b - 5 * r b) (b + 5 * r b)).card : ℝ) := by
+    calc (F'.card : ℝ) ≤ ((U.biUnion fun b => Finset.Icc (b - 5 * r b) (b + 5 * r b)).card : ℝ)
+        := by
           exact_mod_cast Finset.card_le_card hcover
       _ ≤ ∑ b ∈ U, ((Finset.Icc (b - 5 * r b) (b + 5 * r b)).card : ℝ) := by
           exact_mod_cast Finset.card_biUnion_le
@@ -244,7 +245,8 @@ theorem FinSupp.strong_maxZ (ha : FinSupp a S) {p : ℝ} (hp : 1 < p) (F : Finse
       rw [Finset.mul_sum, Finset.sum_mul, ENNReal.ofReal_sum_of_nonneg]
       · refine Finset.sum_congr rfl fun j _ => ?_
         by_cases hj : t < 2 * a j
-        · rw [Set.indicator_of_mem (show t ∈ Set.Ioo 0 (2 * a j) from ⟨ht0, hj⟩), if_pos hj, ← ENNReal.ofReal_mul (by
+        · rw [Set.indicator_of_mem (show t ∈ Set.Ioo 0 (2 * a j) from ⟨ht0, hj⟩), ite_eq_left
+            hj, ← ENNReal.ofReal_mul (by
             simp only [c]; linarith [ha.nonneg j])]
         · rw [Set.indicator_of_notMem (fun h => hj h.2)]; simp [hj]
       · intro j _
@@ -433,14 +435,14 @@ lemma gaussian_prod_integral {a b : ℝ} (ha : 0 < a) (hb : 0 < b) (u v : ℝ) :
   simp only [show u - v + (v - t) = u - t by ring, show (0 : ℝ) - (v - t) = -(v - t) by ring,
     gaussian_neg]
 
-lemma integrable_gaussian_mul_gaussian {a b : ℝ} (ha : 0 < a) (hb : 0 < b) (u v : ℝ) :
+lemma integrable_gaussian_mul_gaussian {a b : ℝ} (ha : 0 < a) (u v : ℝ) :
     Integrable (fun t => gaussian a (u - t) * gaussian b (v - t)) := by
   have h1 : Integrable (fun t => gaussian a (u - t)) := (integrable_gaussian' ha).comp_sub_left u
   have hc : Continuous fun t => gaussian b (v - t) :=
     (continuous_gaussian' b).comp (continuous_const.sub continuous_id)
   exact h1.mul_bdd (c := (√(2 * π * b))⁻¹) hc.aestronglyMeasurable
     (Eventually.of_forall fun t => by
-      show ‖gaussian b (v - t)‖ ≤ _
+      change ‖gaussian b (v - t)‖ ≤ _
       rw [Real.norm_eq_abs, abs_of_nonneg (gaussian_nonneg' _ _)]; exact gaussian_le_sup _ _)
 
 /-- Iterated integrals on `ℝ³`: `∫ F = ∫∫∫ F(x, y, z)` for integrable `F`. -/
@@ -464,7 +466,7 @@ lemma integral_fin3 {F : (Fin 3 → ℝ) → ℝ} (hF : Integrable F) :
     integral_prod _ hint2]
   refine integral_congr_ae (Eventually.of_forall fun y =>
     integral_congr_ae (Eventually.of_forall fun z => ?_))
-  show F (e.symm (x, E2.symm (y, z))) = F ![x, y, z]
+  change F (e.symm (x, E2.symm (y, z))) = F ![x, y, z]
   congr 1
   ext i
   fin_cases i <;> rfl
@@ -479,7 +481,7 @@ lemma plane_gauss_two {τ σa σb : ℝ} (hτ : 0 < τ) (hσa : 0 < σa) (hσb :
       (h * gaussian σa (ua - p a) * (h * gaussian σb (ub - p b) * (h * gaussian σb (ub' - p b)))) =
       h ^ 3 * gaussian (σb + σb) (ub - ub') := by
   have hg : Integrable (fun t => h * gaussian σb (ub - t) * (h * gaussian σb (ub' - t))) := by
-    have := (integrable_gaussian_mul_gaussian hσb hσb ub ub').const_mul (h * h)
+    have := (integrable_gaussian_mul_gaussian (b := σb) hσb ub ub').const_mul (h * h)
     refine this.congr (Eventually.of_forall fun t => ?_)
     simp only; ring
   obtain ⟨hI, hV⟩ := plane_integral_prod (k := gaussian τ)
@@ -634,6 +636,7 @@ lemma w_eq (p σ : Fin 3 → ℝ) (k : Fin 3) (m : ι) :
 lemma Gm_eq (β s : ℝ) (p : Fin 3 → ℝ) : Gm β 0 s p = gaussian (β * s) (p 0 + p 1 + p 2) := by
   simp [Gm, gaussianD_zero]
 
+omit [Fintype ι] [DecidableEq ι] in
 /-- `∫ ρ_{ij} w₁(m) = h³ g_{2σ₁}(u_j - u_m)`. -/
 lemma rho_w1 {β s : ℝ} (hτ : 0 < β * s) {σ : Fin 3 → ℝ} (hσ : ∀ k, 0 < σ k) (i j m : ι) :
     Integrable (fun p => Hd.rho β s σ i j p * Hd.w p σ 1 m) ∧
@@ -647,6 +650,7 @@ lemma rho_w1 {β s : ℝ} (hτ : 0 < β * s) {σ : Fin 3 → ℝ} (hσ : ∀ k, 
     funext p; simp only [rho, Gm_eq, w_eq]; ring
   rw [e]; exact ⟨hI, hV⟩
 
+omit [Fintype ι] [DecidableEq ι] in
 /-- `∫ ρ_{ij} w₀(m) = h³ g_{2σ₀}(u_i - u_m)`. -/
 lemma rho_w0 {β s : ℝ} (hτ : 0 < β * s) {σ : Fin 3 → ℝ} (hσ : ∀ k, 0 < σ k) (i j m : ι) :
     Integrable (fun p => Hd.rho β s σ i j p * Hd.w p σ 0 m) ∧
@@ -660,6 +664,7 @@ lemma rho_w0 {β s : ℝ} (hτ : 0 < β * s) {σ : Fin 3 → ℝ} (hσ : ∀ k, 
     funext p; simp only [rho, Gm_eq, w_eq]; ring
   rw [e]; exact ⟨hI, hV⟩
 
+omit [Fintype ι] [DecidableEq ι] in
 /-- `∫ ρ_{ij} w₂(m) = h³ g_{βs+σ₀+σ₁+σ₂}(u_i + u_j + u_m)`. -/
 lemma rho_w2 {β s : ℝ} (hτ : 0 < β * s) {σ : Fin 3 → ℝ} (hσ : ∀ k, 0 < σ k) (i j m : ι) :
     Integrable (fun p => Hd.rho β s σ i j p * Hd.w p σ 2 m) ∧
@@ -672,6 +677,7 @@ lemma rho_w2 {β s : ℝ} (hτ : 0 < β * s) {σ : Fin 3 → ℝ} (hσ : ∀ k, 
     funext p; simp only [rho, Gm_eq, w_eq]; ring
   rw [e]; exact ⟨hI, hV⟩
 
+omit [Fintype ι] [DecidableEq ι] in
 lemma rho_integrable {β s : ℝ} (hτ : 0 < β * s) {σ : Fin 3 → ℝ} (hσ : ∀ k, 0 < σ k) (i j : ι) :
     Integrable (Hd.rho β s σ i j) := by
   obtain ⟨hI, -⟩ := plane_integral_prod (k := gaussian (β * s))
@@ -684,21 +690,25 @@ lemma rho_integrable {β s : ℝ} (hτ : 0 < β * s) {σ : Fin 3 → ℝ} (hσ :
   refine hI.congr (Eventually.of_forall fun p => ?_)
   simp only [rho, Gm_eq, w_eq]
 
+omit [DecidableEq ι] in
 lemma sq_Xf (hh : 0 ≤ Hd.h) (A : Matrix ι ι ℂ) (p σ : Fin 3 → ℝ) (i : ι) :
     Hd.Xf A p σ i ^ 2 = ∑ m, ‖A i m‖ ^ 2 * Hd.w p σ 1 m :=
-  Real.sq_sqrt (Finset.sum_nonneg fun m _ => mul_nonneg (sq_nonneg _) (gweight_nonneg' _ hh _ _ _))
+  Real.sq_sqrt (Finset.sum_nonneg fun _ _ => mul_nonneg (sq_nonneg _) (gweight_nonneg' _ hh _ _ _))
 
+omit [DecidableEq ι] in
 lemma sq_Yf (hh : 0 ≤ Hd.h) (A : Matrix ι ι ℂ) (p σ : Fin 3 → ℝ) (j : ι) :
     Hd.Yf A p σ j ^ 2 = ∑ m, ‖A m j‖ ^ 2 * Hd.w p σ 0 m :=
-  Real.sq_sqrt (Finset.sum_nonneg fun m _ => mul_nonneg (sq_nonneg _) (gweight_nonneg' _ hh _ _ _))
+  Real.sq_sqrt (Finset.sum_nonneg fun _ _ => mul_nonneg (sq_nonneg _) (gweight_nonneg' _ hh _ _ _))
 
+omit [DecidableEq ι] in
 lemma sq_Hf (hh : 0 ≤ Hd.h) (A : Matrix ι ι ℂ) (p σ : Fin 3 → ℝ) (i : ι) :
     Hd.Hf A p σ i ^ 2 = ∑ m, ‖A m i‖ ^ 2 * Hd.w p σ 2 m :=
-  Real.sq_sqrt (Finset.sum_nonneg fun m _ => mul_nonneg (sq_nonneg _) (gweight_nonneg' _ hh _ _ _))
+  Real.sq_sqrt (Finset.sum_nonneg fun _ _ => mul_nonneg (sq_nonneg _) (gweight_nonneg' _ hh _ _ _))
 
+omit [DecidableEq ι] in
 lemma sq_Qf (hh : 0 ≤ Hd.h) (A : Matrix ι ι ℂ) (p σ : Fin 3 → ℝ) (j : ι) :
     Hd.Qf A p σ j ^ 2 = ∑ m, ‖A j m‖ ^ 2 * Hd.w p σ 2 m :=
-  Real.sq_sqrt (Finset.sum_nonneg fun m _ => mul_nonneg (sq_nonneg _) (gweight_nonneg' _ hh _ _ _))
+  Real.sq_sqrt (Finset.sum_nonneg fun _ _ => mul_nonneg (sq_nonneg _) (gweight_nonneg' _ hh _ _ _))
 
 end HeatData
 
@@ -712,6 +722,7 @@ namespace HeatData
 
 variable (Hd : HeatData ι)
 
+omit [DecidableEq ι] in
 lemma integral_rho_sum {β s : ℝ} {σ : Fin 3 → ℝ} {i j : ι} (k : Fin 3) (c : ι → ℝ)
     (hint : ∀ m, Integrable (fun p => Hd.rho β s σ i j p * Hd.w p σ k m)) :
     Integrable (fun p => Hd.rho β s σ i j p * ∑ m, c m * Hd.w p σ k m) ∧
@@ -727,14 +738,17 @@ lemma integral_rho_sum {β s : ℝ} {σ : Fin 3 → ℝ} {i j : ι} (k : Fin 3) 
 
 variable {kk : ι → ℤ}
 
+omit [Fintype ι] [DecidableEq ι] in
 lemma u_sub {τ : ℝ} (hu : ∀ i, Hd.u i = Hd.h * kk i) (j m : ι) :
     gaussian τ (Hd.u j - Hd.u m) = gaussian τ (Hd.h * (kk m - kk j)) := by
   rw [hu, hu, ← gaussian_neg]; congr 1; ring
 
+omit [Fintype ι] [DecidableEq ι] in
 lemma u_add {τ : ℝ} (hu : ∀ i, Hd.u i = Hd.h * kk i) (i j m : ι) :
     gaussian τ (Hd.u i + Hd.u j + Hd.u m) = gaussian τ (Hd.h * (kk m - (-kk i - kk j))) := by
-  rw [hu, hu, hu]; congr 1; push_cast; ring
+  rw [hu, hu, hu]; congr 1; ring
 
+omit [DecidableEq ι] in
 /-- **Lemma 5.2, expectation of `X²`:** `∫ ρ_{ij} X(i)² ≤ C h² M_ℤ(|A(i,·)|²)(k_j)`. -/
 theorem E_X (hk : Function.Injective kk) (hu : ∀ i, Hd.u i = Hd.h * kk i) (hh : 0 < Hd.h)
     {β s : ℝ} (hτ : 0 < β * s) {σ : Fin 3 → ℝ} (hσ : ∀ k, 0 < σ k)
@@ -742,6 +756,7 @@ theorem E_X (hk : Function.Injective kk) (hu : ∀ i, Hd.u i = Hd.h * kk i) (hh 
     Integrable (fun p => Hd.rho β s σ i j p * Hd.Xf A p σ i ^ 2) ∧
     ∫ p, Hd.rho β s σ i j p * Hd.Xf A p σ i ^ 2 ≤
       Hd.h ^ 2 * ((1 + √(2 / π)) * maxZ (zext kk fun m => ‖A i m‖ ^ 2) (kk j)) := by
+  classical
   simp only [Hd.sq_Xf hh.le]
   obtain ⟨hI, hV⟩ := Hd.integral_rho_sum 1 (fun m => ‖A i m‖ ^ 2)
     fun m => (Hd.rho_w1 hτ hσ i j m).1
@@ -754,6 +769,7 @@ theorem E_X (hk : Function.Injective kk) (hu : ∀ i, Hd.u i = Hd.h * kk i) (hh 
         rw [Finset.mul_sum]; exact Finset.sum_congr rfl fun m _ => by ring
     _ ≤ _ := by gcongr
 
+omit [DecidableEq ι] in
 /-- **Lemma 5.2, expectation of `Y²`:** `∫ ρ_{ij} Y(j)² ≤ C h² M_ℤ(|A(·,j)|²)(k_i)`. -/
 theorem E_Y (hk : Function.Injective kk) (hu : ∀ i, Hd.u i = Hd.h * kk i) (hh : 0 < Hd.h)
     {β s : ℝ} (hτ : 0 < β * s) {σ : Fin 3 → ℝ} (hσ : ∀ k, 0 < σ k)
@@ -761,6 +777,7 @@ theorem E_Y (hk : Function.Injective kk) (hu : ∀ i, Hd.u i = Hd.h * kk i) (hh 
     Integrable (fun p => Hd.rho β s σ i j p * Hd.Yf A p σ j ^ 2) ∧
     ∫ p, Hd.rho β s σ i j p * Hd.Yf A p σ j ^ 2 ≤
       Hd.h ^ 2 * ((1 + √(2 / π)) * maxZ (zext kk fun m => ‖A m j‖ ^ 2) (kk i)) := by
+  classical
   simp only [Hd.sq_Yf hh.le]
   obtain ⟨hI, hV⟩ := Hd.integral_rho_sum 0 (fun m => ‖A m j‖ ^ 2)
     fun m => (Hd.rho_w0 hτ hσ i j m).1
@@ -773,6 +790,7 @@ theorem E_Y (hk : Function.Injective kk) (hu : ∀ i, Hd.u i = Hd.h * kk i) (hh 
         rw [Finset.mul_sum]; exact Finset.sum_congr rfl fun m _ => by ring
     _ ≤ _ := by gcongr
 
+omit [DecidableEq ι] in
 /-- **Lemma 5.2, expectation of `H²`:** `∫ ρ_{ij} H(i)² ≤ C h² M_ℤ(|A₂(·,i)|²)(-k_i-k_j)`. -/
 theorem E_H (hk : Function.Injective kk) (hu : ∀ i, Hd.u i = Hd.h * kk i) (hh : 0 < Hd.h)
     {β s : ℝ} (hτ : 0 < β * s) {σ : Fin 3 → ℝ} (hσ : ∀ k, 0 < σ k)
@@ -780,6 +798,7 @@ theorem E_H (hk : Function.Injective kk) (hu : ∀ i, Hd.u i = Hd.h * kk i) (hh 
     Integrable (fun p => Hd.rho β s σ i j p * Hd.Hf A p σ i ^ 2) ∧
     ∫ p, Hd.rho β s σ i j p * Hd.Hf A p σ i ^ 2 ≤
       Hd.h ^ 2 * ((1 + √(2 / π)) * maxZ (zext kk fun m => ‖A m i‖ ^ 2) (-kk i - kk j)) := by
+  classical
   simp only [Hd.sq_Hf hh.le]
   obtain ⟨hI, hV⟩ := Hd.integral_rho_sum 2 (fun m => ‖A m i‖ ^ 2)
     fun m => (Hd.rho_w2 hτ hσ i j m).1
@@ -798,6 +817,7 @@ theorem E_H (hk : Function.Injective kk) (hu : ∀ i, Hd.u i = Hd.h * kk i) (hh 
         convert this using 3
         push_cast; ring
 
+omit [DecidableEq ι] in
 /-- **Lemma 5.2, expectation of `Q²`:** `∫ ρ_{ij} Q(j)² ≤ C h² M_ℤ(|A₁(j,·)|²)(-k_i-k_j)`. -/
 theorem E_Q (hk : Function.Injective kk) (hu : ∀ i, Hd.u i = Hd.h * kk i) (hh : 0 < Hd.h)
     {β s : ℝ} (hτ : 0 < β * s) {σ : Fin 3 → ℝ} (hσ : ∀ k, 0 < σ k)
@@ -805,6 +825,7 @@ theorem E_Q (hk : Function.Injective kk) (hu : ∀ i, Hd.u i = Hd.h * kk i) (hh 
     Integrable (fun p => Hd.rho β s σ i j p * Hd.Qf A p σ j ^ 2) ∧
     ∫ p, Hd.rho β s σ i j p * Hd.Qf A p σ j ^ 2 ≤
       Hd.h ^ 2 * ((1 + √(2 / π)) * maxZ (zext kk fun m => ‖A j m‖ ^ 2) (-kk i - kk j)) := by
+  classical
   simp only [Hd.sq_Qf hh.le]
   obtain ⟨hI, hV⟩ := Hd.integral_rho_sum 2 (fun m => ‖A j m‖ ^ 2)
     fun m => (Hd.rho_w2 hτ hσ i j m).1
@@ -912,10 +933,10 @@ omit [Fintype ι] [DecidableEq ι] in
 @[simp] lemma withA0_A0 (B : Matrix ι ι ℂ) : (Hd.withA0 B).A 0 = B := by simp [withA0]
 omit [Fintype ι] [DecidableEq ι] in
 @[simp] lemma withA0_A1 (B : Matrix ι ι ℂ) : (Hd.withA0 B).A 1 = Hd.A 1 := by
-  simp [withA0, Function.update_of_ne (show (1 : Fin 3) ≠ 0 by decide)]
+  simp [withA0]
 omit [Fintype ι] [DecidableEq ι] in
 @[simp] lemma withA0_A2 (B : Matrix ι ι ℂ) : (Hd.withA0 B).A 2 = Hd.A 2 := by
-  simp [withA0, Function.update_of_ne (show (2 : Fin 3) ≠ 0 by decide)]
+  simp [withA0]
 omit [Fintype ι] [DecidableEq ι] in
 @[simp] lemma withA0_w (B : Matrix ι ι ℂ) : (Hd.withA0 B).w = Hd.w := rfl
 omit [Fintype ι] [DecidableEq ι] in
@@ -925,7 +946,7 @@ lemma W_apply (p σ : Fin 3 → ℝ) (v : Fin 3) (i j : ι) :
     Hd.W p σ v i j = (Hd.sqw p σ v i : ℂ) * Hd.A v i j * (Hd.sqw p σ (v + 1) j : ℂ) := by
   rw [W, rdiag_mul_mul_rdiag_apply]
 
-omit [DecidableEq ι] in
+omit [DecidableEq ι] [Fintype ι] in
 lemma norm_sqw_sq (hh : 0 ≤ Hd.h) (p σ : Fin 3 → ℝ) (k : Fin 3) (i : ι) :
     ‖(Hd.sqw p σ k i : ℂ)‖ ^ 2 = Hd.w p σ k i := by
   rw [Complex.norm_real, Real.norm_eq_abs, sq_abs]
@@ -1007,17 +1028,19 @@ theorem jump_pointwise (hh : 0 ≤ Hd.h) {η : ℝ} (hη : 0 < η) (Bm Bp B0 : M
     fun z hz i j => norm_convex_le hz (hm i j) (hp i j)
   ------------------------------------------------------------------ the row matrix `R₀`
   set K0 : ι → ι ⊕ ι → ℝ := fun i b => match b with
-    | Sum.inl j => (√(Hd.w p σ 0 i) * (Hd.Xf B0 p σ i + Hd.Hf (Hd.A 2) p σ i)) * (√(Hd.w p σ 1 j) * Hd.Yf B0 p σ j + √η) *
+    | Sum.inl j => (√(Hd.w p σ 0 i) * (Hd.Xf B0 p σ i + Hd.Hf (Hd.A 2) p σ i)) * (√(Hd.w p σ 1
+        j) * Hd.Yf B0 p σ j + √η) *
         (√(Hd.w p σ 0 i) * ‖Bp i j - Bm i j‖ * √(Hd.w p σ 1 j))
     | Sum.inr _ => 0
   have hE0 : |(Hd.withA0 Bp).e p σ η 0 - (Hd.withA0 Bm).e p σ η 0| ≤ 3 * ∑ i, ∑ b, K0 i b := by
-    refine abs_energyReg_change_le ((Hd.withA0 Bm).R p σ 0) ((Hd.withA0 Bp).R p σ 0) hη K0 fun z hz i b => ?_
+    refine abs_energyReg_change_le ((Hd.withA0 Bm).R p σ 0) ((Hd.withA0 Bp).R p σ 0) hη K0 fun z
+        hz i b => ?_
     set Rz := (1 - z) • (Hd.withA0 Bm).R p σ 0 + z • (Hd.withA0 Bp).R p σ 0
     have Rl : ∀ i j, Rz i (Sum.inl j) =
         (Hd.sqw p σ 0 i : ℂ) * ((1 - z) • Bm i j + z • Bp i j) * (Hd.sqw p σ 1 j : ℂ) := by
       intro i j
       simp only [Rz, Matrix.add_apply, Matrix.smul_apply, R_inl, W0]
-      simp only [smul_eq_mul, Complex.real_smul]; ring
+      simp only [Complex.real_smul]; ring
     have Rr : ∀ i m, Rz i (Sum.inr m) = star (Hd.W p σ 2 m i) := by
       intro i m
       simp only [Rz, Matrix.add_apply, Matrix.smul_apply, R_inr, e02, W2]
@@ -1026,7 +1049,8 @@ theorem jump_pointwise (hh : 0 ≤ Hd.h) {η : ℝ} (hη : 0 < η) (Bm Bp B0 : M
       rw [← add_smul]; simp
     rcases b with j | m
     · -- row and column bounds
-      have hrow : ∑ c, ‖Rz i c‖ ^ 2 ≤ (√(Hd.w p σ 0 i) * (Hd.Xf B0 p σ i + Hd.Hf (Hd.A 2) p σ i)) ^ 2 := by
+      have hrow : ∑ c, ‖Rz i c‖ ^ 2 ≤ (√(Hd.w p σ 0 i) * (Hd.Xf B0 p σ i + Hd.Hf (Hd.A 2) p σ
+          i)) ^ 2 := by
         rw [Fintype.sum_sum_type]
         have h1 : ∑ j, ‖Rz i (Sum.inl j)‖ ^ 2 ≤ Hd.w p σ 0 i * Hd.Xf B0 p σ i ^ 2 := by
           rw [hX2, Finset.mul_sum]
@@ -1063,10 +1087,12 @@ theorem jump_pointwise (hh : 0 ≤ Hd.h) {η : ℝ} (hη : 0 < η) (Bm Bp B0 : M
   ------------------------------------------------------------------ the row matrix `R₁`
   set K1 : ι → ι ⊕ ι → ℝ := fun j b => match b with
     | Sum.inl _ => 0
-    | Sum.inr i => (√(Hd.w p σ 1 j) * (Hd.Yf B0 p σ j + Hd.Qf (Hd.A 1) p σ j)) * (√(Hd.w p σ 0 i) * Hd.Xf B0 p σ i + √η) *
+    | Sum.inr i => (√(Hd.w p σ 1 j) * (Hd.Yf B0 p σ j + Hd.Qf (Hd.A 1) p σ j)) * (√(Hd.w p σ 0
+        i) * Hd.Xf B0 p σ i + √η) *
         (√(Hd.w p σ 0 i) * ‖Bp i j - Bm i j‖ * √(Hd.w p σ 1 j))
   have hE1 : |(Hd.withA0 Bp).e p σ η 1 - (Hd.withA0 Bm).e p σ η 1| ≤ 3 * ∑ j, ∑ b, K1 j b := by
-    refine abs_energyReg_change_le ((Hd.withA0 Bm).R p σ 1) ((Hd.withA0 Bp).R p σ 1) hη K1 fun z hz j b => ?_
+    refine abs_energyReg_change_le ((Hd.withA0 Bm).R p σ 1) ((Hd.withA0 Bp).R p σ 1) hη K1 fun z
+        hz j b => ?_
     set Rz := (1 - z) • (Hd.withA0 Bm).R p σ 1 + z • (Hd.withA0 Bp).R p σ 1
     have Rl : ∀ j m, Rz j (Sum.inl m) = Hd.W p σ 1 j m := by
       intro j m
@@ -1078,14 +1104,15 @@ theorem jump_pointwise (hh : 0 ≤ Hd.h) {η : ℝ} (hη : 0 < η) (Bm Bp B0 : M
         star ((Hd.sqw p σ 0 i : ℂ) * ((1 - z) • Bm i j + z • Bp i j) * (Hd.sqw p σ 1 j : ℂ)) := by
       intro j i
       simp only [Rz, Matrix.add_apply, Matrix.smul_apply, R_inr, e12, W0]
-      simp only [smul_eq_mul, Complex.real_smul, star_mul', star_add, Complex.star_def,
-        map_mul, Complex.conj_ofReal]
+      simp only [Complex.real_smul, star_mul', star_add, Complex.star_def,
+        Complex.conj_ofReal]
       ring
     rcases b with m | i
     · have hD : ((Hd.withA0 Bp).R p σ 1 - (Hd.withA0 Bm).R p σ 1) j (Sum.inl m) = 0 := by
         rw [Matrix.sub_apply, R_inl, R_inl, W1, W1, sub_self]
       rw [hD, norm_zero, mul_zero]
-    · have hrow : ∑ c, ‖Rz j c‖ ^ 2 ≤ (√(Hd.w p σ 1 j) * (Hd.Yf B0 p σ j + Hd.Qf (Hd.A 1) p σ j)) ^ 2 := by
+    · have hrow : ∑ c, ‖Rz j c‖ ^ 2 ≤ (√(Hd.w p σ 1 j) * (Hd.Yf B0 p σ j + Hd.Qf (Hd.A 1) p σ
+        j)) ^ 2 := by
         rw [Fintype.sum_sum_type]
         have h1 : ∑ m, ‖Rz j (Sum.inl m)‖ ^ 2 = Hd.w p σ 1 j * Hd.Qf (Hd.A 1) p σ j ^ 2 := by
           rw [hQ2, Finset.mul_sum]
@@ -1121,12 +1148,14 @@ theorem jump_pointwise (hh : 0 ≤ Hd.h) {η : ℝ} (hη : 0 < η) (Bm Bp B0 : M
   rw [Fin.sum_univ_three, Fin.sum_univ_three]
   have hsplit : (Hd.withA0 Bp).e p σ η 0 + (Hd.withA0 Bp).e p σ η 1 + (Hd.withA0 Bp).e p σ η 2 -
       ((Hd.withA0 Bm).e p σ η 0 + (Hd.withA0 Bm).e p σ η 1 + (Hd.withA0 Bm).e p σ η 2) =
-      ((Hd.withA0 Bp).e p σ η 0 - (Hd.withA0 Bm).e p σ η 0) + ((Hd.withA0 Bp).e p σ η 1 - (Hd.withA0 Bm).e p σ η 1) := by
+      ((Hd.withA0 Bp).e p σ η 0 - (Hd.withA0 Bm).e p σ η 0) + ((Hd.withA0 Bp).e p σ η 1 -
+          (Hd.withA0 Bm).e p σ η 1) := by
     rw [hE2]; ring
   rw [hsplit]
   refine (abs_add_le _ _).trans ((add_le_add hE0 hE1).trans (le_of_eq ?_))
   simp only [Fintype.sum_sum_type, K0, K1, Finset.sum_const_zero, add_zero, zero_add]
-  rw [Finset.sum_comm (f := fun j i => (√(Hd.w p σ 1 j) * (Hd.Yf B0 p σ j + Hd.Qf (Hd.A 1) p σ j)) * (√(Hd.w p σ 0 i) * Hd.Xf B0 p σ i + √η) *
+  rw [Finset.sum_comm (f := fun j i => (√(Hd.w p σ 1 j) * (Hd.Yf B0 p σ j + Hd.Qf (Hd.A 1) p σ
+      j)) * (√(Hd.w p σ 0 i) * Hd.Xf B0 p σ i + √η) *
     (√(Hd.w p σ 0 i) * ‖Bp i j - Bm i j‖ * √(Hd.w p σ 1 j))), ← mul_add, ← Finset.sum_add_distrib]
   congr 1
   refine Finset.sum_congr rfl fun i _ => ?_
@@ -1134,9 +1163,11 @@ theorem jump_pointwise (hh : 0 ≤ Hd.h) {η : ℝ} (hη : 0 < η) (Bm Bp B0 : M
   refine Finset.sum_congr rfl fun j _ => ?_
   have a1 : √(Hd.w p σ 0 i) * √(Hd.w p σ 0 i) = Hd.w p σ 0 i := hsqsq 0 i
   have a2 : √(Hd.w p σ 1 j) * √(Hd.w p σ 1 j) = Hd.w p σ 1 j := hsqsq 1 j
-  linear_combination (‖Bp i j - Bm i j‖ * ((Hd.Xf B0 p σ i + Hd.Hf (Hd.A 2) p σ i) * Hd.Yf B0 p σ j + (Hd.Yf B0 p σ j + Hd.Qf (Hd.A 1) p σ j) * Hd.Xf B0 p σ i) * √(Hd.w p σ 1 j) ^ 2 +
+  linear_combination (‖Bp i j - Bm i j‖ * ((Hd.Xf B0 p σ i + Hd.Hf (Hd.A 2) p σ i) * Hd.Yf B0 p
+      σ j + (Hd.Yf B0 p σ j + Hd.Qf (Hd.A 1) p σ j) * Hd.Xf B0 p σ i) * √(Hd.w p σ 1 j) ^ 2 +
       √η * ‖Bp i j - Bm i j‖ * (Hd.Xf B0 p σ i + Hd.Hf (Hd.A 2) p σ i) * √(Hd.w p σ 1 j)) * a1 +
-    (‖Bp i j - Bm i j‖ * ((Hd.Xf B0 p σ i + Hd.Hf (Hd.A 2) p σ i) * Hd.Yf B0 p σ j + (Hd.Yf B0 p σ j + Hd.Qf (Hd.A 1) p σ j) * Hd.Xf B0 p σ i) * Hd.w p σ 0 i +
+    (‖Bp i j - Bm i j‖ * ((Hd.Xf B0 p σ i + Hd.Hf (Hd.A 2) p σ i) * Hd.Yf B0 p σ j + (Hd.Yf B0 p
+        σ j + Hd.Qf (Hd.A 1) p σ j) * Hd.Xf B0 p σ i) * Hd.w p σ 0 i +
       √η * ‖Bp i j - Bm i j‖ * (Hd.Yf B0 p σ j + Hd.Qf (Hd.A 1) p σ j) * √(Hd.w p σ 0 i)) * a2
 
 end HeatData
@@ -1225,7 +1256,7 @@ namespace HeatData
 
 variable (Hd : HeatData ι)
 
-omit [DecidableEq ι] in
+omit [DecidableEq ι] [Fintype ι] in
 lemma continuous_w_p (σ : Fin 3 → ℝ) (hσ : ∀ k, 0 < σ k) (k : Fin 3) (m : ι) :
     Continuous fun p : Fin 3 → ℝ => Hd.w p σ k m :=
   Hd.continuous_w continuous_id continuous_const (fun _ => hσ) k m
@@ -1233,10 +1264,10 @@ lemma continuous_w_p (σ : Fin 3 → ℝ) (hσ : ∀ k, 0 < σ k) (k : Fin 3) (m
 omit [DecidableEq ι] in
 lemma continuous_wsum (σ : Fin 3 → ℝ) (hσ : ∀ k, 0 < σ k) (k : Fin 3) (c : ι → ℝ) :
     Continuous fun p : Fin 3 → ℝ => √(∑ m, c m * Hd.w p σ k m) :=
-  Real.continuous_sqrt.comp (continuous_finset_sum _ fun m _ =>
+  Real.continuous_sqrt.comp (continuous_finsetSum _ fun m _ =>
     continuous_const.mul (Hd.continuous_w_p σ hσ k m))
 
-omit [DecidableEq ι] in
+omit [DecidableEq ι] [Fintype ι] in
 lemma w_le_sup (hh : 0 ≤ Hd.h) (p σ : Fin 3 → ℝ) (k : Fin 3) (m : ι) :
     Hd.w p σ k m ≤ Hd.h * (√(2 * π * σ k))⁻¹ :=
   mul_le_mul_of_nonneg_left (gaussian_le_sup _ _) hh
@@ -1247,7 +1278,9 @@ lemma wsum_le (hh : 0 ≤ Hd.h) (p σ : Fin 3 → ℝ) (k : Fin 3) (c : ι → �
   Real.sqrt_le_sqrt (Finset.sum_le_sum fun m _ =>
     mul_le_mul_of_nonneg_left (Hd.w_le_sup hh p σ k m) (hc m))
 
-lemma rho_continuous (β s : ℝ) (hτ : 0 < β * s) (σ : Fin 3 → ℝ) (hσ : ∀ k, 0 < σ k) (i j : ι) :
+omit [DecidableEq ι] [Fintype ι] in
+lemma rho_continuous (β s : ℝ) (σ : Fin 3 → ℝ) (hσ : ∀ k, 0 < σ k)
+    (i j : ι) :
     Continuous (Hd.rho β s σ i j) := by
   have : Hd.rho β s σ i j = fun p => gaussian (β * s) (p 0 + p 1 + p 2) *
       (Hd.w p σ 0 i * Hd.w p σ 1 j) := by funext p; rw [rho, Gm_eq]
@@ -1255,12 +1288,14 @@ lemma rho_continuous (β s : ℝ) (hτ : 0 < β * s) (σ : Fin 3 → ℝ) (hσ :
   exact ((continuous_gaussian' _).comp (by fun_prop)).mul
     ((Hd.continuous_w_p σ hσ 0 i).mul (Hd.continuous_w_p σ hσ 1 j))
 
+omit [Fintype ι] [DecidableEq ι] in
 lemma rho_nonneg (hh : 0 ≤ Hd.h) (β s : ℝ) (σ : Fin 3 → ℝ) (i j : ι) (p : Fin 3 → ℝ) :
     0 ≤ Hd.rho β s σ i j p := by
   rw [rho, Gm_eq]
   exact mul_nonneg (gaussian_nonneg' _ _) (mul_nonneg (gweight_nonneg' _ hh _ _ _)
     (gweight_nonneg' _ hh _ _ _))
 
+omit [Fintype ι] [DecidableEq ι] in
 /-- `g_{βs}(p₀+p₁+p₂) w₀(i) √w₁(j)` is integrable. -/
 lemma G_w0_sqrtw1_integrable (hh : 0 ≤ Hd.h) {β s : ℝ} (hτ : 0 < β * s) {σ : Fin 3 → ℝ}
     (hσ : ∀ k, 0 < σ k) (i j : ι) :
@@ -1275,6 +1310,7 @@ lemma G_w0_sqrtw1_integrable (hh : 0 ≤ Hd.h) {β s : ℝ} (hτ : 0 < β * s) {
   refine hI.congr (Eventually.of_forall fun p => ?_)
   simp only [Gm_eq, w_eq]
 
+omit [Fintype ι] [DecidableEq ι] in
 /-- `g_{βs}(p₀+p₁+p₂) √w₀(i) w₁(j)` is integrable. -/
 lemma G_sqrtw0_w1_integrable (hh : 0 ≤ Hd.h) {β s : ℝ} (hτ : 0 < β * s) {σ : Fin 3 → ℝ}
     (hσ : ∀ k, 0 < σ k) (i j : ι) :
@@ -1328,10 +1364,11 @@ namespace HeatData
 
 variable (Hd : HeatData ι) {kk : ι → ℤ}
 
-lemma sqrt_h2_mul {h a : ℝ} (hh : 0 ≤ h) (c : ℝ) (hc : 0 ≤ c) (ha : 0 ≤ a) :
+lemma sqrt_h2_mul {h a : ℝ} (hh : 0 ≤ h) (c : ℝ) (hc : 0 ≤ c) :
     √(h ^ 2 * (c * a)) = h * √c * √a := by
   rw [Real.sqrt_mul (sq_nonneg h), Real.sqrt_sq hh, Real.sqrt_mul hc, mul_assoc]
 
+omit [DecidableEq ι] in
 /-- **Lemma 5.2, the cross terms:** `∫ ρ_{ij} (2XY + HY + QX) ≤ C h² (2X_*Y_* + H_*Y_* + Q_*X_*)`
 with `C = 1 + √(2/π)` (Cauchy–Schwarz and the maximal bounds). -/
 theorem rho_cross_le (hk : Function.Injective kk) (hu : ∀ i, Hd.u i = Hd.h * kk i)
@@ -1346,6 +1383,7 @@ theorem rho_cross_le (hk : Function.Injective kk) (hu : ∀ i, Hd.u i = Hd.h * k
         Hd.Qf (Hd.A 1) p σ j * Hd.Xf B0 p σ i) ≤
       (1 + √(2 / π)) * Hd.h ^ 2 * (2 * Xs kk B0 i j * Ys kk B0 i j +
         Hs kk (Hd.A 2) i j * Ys kk B0 i j + Qs kk (Hd.A 1) i j * Xs kk B0 i j) := by
+  classical
   set C := 1 + √(2 / π)
   have hC : 0 ≤ C := by positivity
   obtain ⟨iX, eX⟩ := Hd.E_X hk hu hh hτ hσ h1 B0 i j
@@ -1353,7 +1391,7 @@ theorem rho_cross_le (hk : Function.Injective kk) (hu : ∀ i, Hd.u i = Hd.h * k
   obtain ⟨iH, eH⟩ := Hd.E_H hk hu hh hτ hσ h2 (Hd.A 2) i j
   obtain ⟨iQ, eQ⟩ := Hd.E_Q hk hu hh hτ hσ h2 (Hd.A 1) i j
   have hρ := Hd.rho_nonneg hh.le β s σ i j
-  have hρc := Hd.rho_continuous β s hτ σ hσ i j
+  have hρc := Hd.rho_continuous β s σ hσ i j
   have cX : Continuous fun p => Hd.Xf B0 p σ i := Hd.continuous_wsum σ hσ 1 _
   have cY : Continuous fun p => Hd.Yf B0 p σ j := Hd.continuous_wsum σ hσ 0 _
   have cH : Continuous fun p => Hd.Hf (Hd.A 2) p σ i := Hd.continuous_wsum σ hσ 2 _
@@ -1377,7 +1415,7 @@ theorem rho_cross_le (hk : Function.Injective kk) (hu : ∀ i, Hd.u i = Hd.h * k
           mul_le_mul (Real.sqrt_le_sqrt ef) (Real.sqrt_le_sqrt eg) (Real.sqrt_nonneg _)
             (Real.sqrt_nonneg _)
       _ = C * Hd.h ^ 2 * (√a * √b) := by
-          rw [sqrt_h2_mul hh.le C hC ha, sqrt_h2_mul hh.le C hC hb,
+          rw [sqrt_h2_mul hh.le C hC, sqrt_h2_mul hh.le C hC,
             show Hd.h * √C * √a * (Hd.h * √C * √b) = (√C * √C) * Hd.h ^ 2 * (√a * √b) by ring,
             Real.mul_self_sqrt hC]
   have bXY := bound _ _ _ _ (hM _ _ fun m => sq_nonneg _) (hM _ _ fun m => sq_nonneg _)
@@ -1437,11 +1475,13 @@ def jumpErr (α : Fin 3 → ℝ) (s : ℝ) (B0 Bm Bp : Matrix ι ι ℂ) : ℝ :
       √(Hd.w p (sig α s) 0 i) * Hd.w p (sig α s) 1 j *
         (Hd.Yf B0 p (sig α s) j + Hd.Qf (Hd.A 1) p (sig α s) j))
 
+omit [DecidableEq ι] in
 lemma err_integrable (hh : 0 < Hd.h) {β s : ℝ} (hτ : 0 < β * s) {σ : Fin 3 → ℝ}
     (hσ : ∀ k, 0 < σ k) (B0 : Matrix ι ι ℂ) (i j : ι) :
     Integrable (fun p => Gm β 0 s p *
       (Hd.w p σ 0 i * √(Hd.w p σ 1 j) * (Hd.Xf B0 p σ i + Hd.Hf (Hd.A 2) p σ i) +
         √(Hd.w p σ 0 i) * Hd.w p σ 1 j * (Hd.Yf B0 p σ j + Hd.Qf (Hd.A 1) p σ j))) := by
+  classical
   set CX := √(∑ m, ‖B0 i m‖ ^ 2 * (Hd.h * (√(2 * π * σ 1))⁻¹))
   set CH := √(∑ m, ‖Hd.A 2 m i‖ ^ 2 * (Hd.h * (√(2 * π * σ 2))⁻¹))
   set CY := √(∑ m, ‖B0 m j‖ ^ 2 * (Hd.h * (√(2 * π * σ 0))⁻¹))
@@ -1650,6 +1690,7 @@ lemma sqrt_pow_three {x : ℝ} (hx : 0 ≤ x) : √x ^ 3 = x ^ (3 / 2 : ℝ) := 
 
 variable {ι : Type*} [Fintype ι] [DecidableEq ι] {kk : ι → ℤ}
 
+omit [DecidableEq ι] in
 /-- The maximal function in `ℓ^{3/2}` along an injective window. -/
 lemma sum_maxZ_comp_le (hk : Function.Injective kk) (f : ι → ℝ) (hf : ∀ m, 0 ≤ f m)
     {φ : ι → ℤ} (hφ : Function.Injective φ) :
@@ -1668,9 +1709,11 @@ lemma sum_maxZ_comp_le (hk : Function.Injective kk) (f : ι → ℝ) (hf : ∀ m
     rw [show (3 : ℝ) / 2 - 1 = 1 / 2 by norm_num, ← Real.sqrt_eq_rpow]; ring
   rwa [hC] at this
 
+omit [DecidableEq ι] in
 /-- `∑_{ij} X_*³ ≤ 30√2 ∑_{ij} |B(i,j)|³`. -/
 lemma sum_Xs_cube (hk : Function.Injective kk) (B : Matrix ι ι ℂ) :
     ∑ i, ∑ j, Xs kk B i j ^ 3 ≤ 30 * √2 * ∑ i, ∑ j, ‖B i j‖ ^ 3 := by
+  classical
   rw [Finset.mul_sum]
   refine Finset.sum_le_sum fun i _ => ?_
   have h := sum_maxZ_comp_le hk (fun m => ‖B i m‖ ^ 2) (fun m => sq_nonneg _) hk
@@ -1681,9 +1724,11 @@ lemma sum_Xs_cube (hk : Function.Injective kk) (B : Matrix ι ι ℂ) :
   congr 1; refine Finset.sum_congr rfl fun m _ => ?_
   rw [← Real.rpow_natCast, ← Real.rpow_mul (norm_nonneg _)]; norm_num
 
+omit [DecidableEq ι] in
 /-- `∑_{ij} Y_*³ ≤ 30√2 ∑_{ij} |B(i,j)|³`. -/
 lemma sum_Ys_cube (hk : Function.Injective kk) (B : Matrix ι ι ℂ) :
     ∑ i, ∑ j, Ys kk B i j ^ 3 ≤ 30 * √2 * ∑ i, ∑ j, ‖B i j‖ ^ 3 := by
+  classical
   rw [Finset.sum_comm, Finset.sum_comm (f := fun i j => ‖B i j‖ ^ 3), Finset.mul_sum]
   refine Finset.sum_le_sum fun j _ => ?_
   have h := sum_maxZ_comp_le hk (fun m => ‖B m j‖ ^ 2) (fun m => sq_nonneg _) hk
@@ -1694,9 +1739,11 @@ lemma sum_Ys_cube (hk : Function.Injective kk) (B : Matrix ι ι ℂ) :
   congr 1; refine Finset.sum_congr rfl fun m _ => ?_
   rw [← Real.rpow_natCast, ← Real.rpow_mul (norm_nonneg _)]; norm_num
 
+omit [DecidableEq ι] in
 /-- `∑_{ij} H_*³ ≤ 30√2 ∑_{ij} |A(i,j)|³`. -/
 lemma sum_Hs_cube (hk : Function.Injective kk) (A : Matrix ι ι ℂ) :
     ∑ i, ∑ j, Hs kk A i j ^ 3 ≤ 30 * √2 * ∑ i, ∑ j, ‖A i j‖ ^ 3 := by
+  classical
   rw [Finset.sum_comm (f := fun i j => ‖A i j‖ ^ 3), Finset.mul_sum]
   refine Finset.sum_le_sum fun i _ => ?_
   have h := sum_maxZ_comp_le hk (fun m => ‖A m i‖ ^ 2) (fun m => sq_nonneg _)
@@ -1708,9 +1755,11 @@ lemma sum_Hs_cube (hk : Function.Injective kk) (A : Matrix ι ι ℂ) :
   congr 1; refine Finset.sum_congr rfl fun m _ => ?_
   rw [← Real.rpow_natCast, ← Real.rpow_mul (norm_nonneg _)]; norm_num
 
+omit [DecidableEq ι] in
 /-- `∑_{ij} Q_*³ ≤ 30√2 ∑_{ij} |A(i,j)|³`. -/
 lemma sum_Qs_cube (hk : Function.Injective kk) (A : Matrix ι ι ℂ) :
     ∑ i, ∑ j, Qs kk A i j ^ 3 ≤ 30 * √2 * ∑ i, ∑ j, ‖A i j‖ ^ 3 := by
+  classical
   rw [Finset.sum_comm, Finset.mul_sum]
   refine Finset.sum_le_sum fun j _ => ?_
   have h := sum_maxZ_comp_le hk (fun m => ‖A j m‖ ^ 2) (fun m => sq_nonneg _)
@@ -1787,6 +1836,7 @@ lemma nNorm_cube (h : ℝ) (A : Matrix ι ι ℂ) :
   rw [nNorm, ← Real.rpow_natCast, ← Real.rpow_mul (mul_nonneg (sq_nonneg h) (by positivity))]
   norm_num
 
+omit [DecidableEq ι] in
 /-- **Lemma 5.2, Hölder on `ℤ²`:**
 `h² ∑ |B₀|(2X_*Y_* + H_*Y_* + Q_*X_*) ≤ (30√2)^{2/3} (2n₀³ + n₀²n₂ + n₀²n₁)`. -/
 theorem cross_holder (hk : Function.Injective kk) (h : ℝ) (B0 A1 A2 : Matrix ι ι ℂ) :
@@ -1794,6 +1844,7 @@ theorem cross_holder (hk : Function.Injective kk) (h : ℝ) (B0 A1 A2 : Matrix �
         Hs kk A2 i j * Ys kk B0 i j + Qs kk A1 i j * Xs kk B0 i j) ≤
       (30 * √2) ^ (2 / 3 : ℝ) * (2 * nNorm h B0 ^ 3 + nNorm h B0 ^ 2 * nNorm h A2 +
         nNorm h B0 ^ 2 * nNorm h A1) := by
+  classical
   set C := 30 * √2
   have hC : 0 ≤ C := by positivity
   set S0 := ∑ i, ∑ j, ‖B0 i j‖ ^ 3
@@ -1955,7 +2006,7 @@ namespace HeatData
 
 variable (Hd : HeatData ι)
 
-lemma Jbar_nonneg (hh : 0 ≤ Hd.h) (α : Fin 3 → ℝ) {η : ℝ} (hη : 0 ≤ η) (s : ℝ) :
+lemma Jbar_nonneg (α : Fin 3 → ℝ) {η : ℝ} (hη : 0 ≤ η) (s : ℝ) :
     0 ≤ Hd.Jbar α η s := by
   refine integral_nonneg fun p => mul_nonneg ?_ (Finset.sum_nonneg fun v _ =>
     (energyReg_bounds (Matrix.posSemidef_conjTranspose_mul_self _) hη).1)
@@ -2020,7 +2071,7 @@ theorem integrated_cost_reg (hk : Function.Injective kk) (hu : ∀ i, Hd.u i = H
   have hα2 : ∀ k, α k ≤ 2 := fun k => by rcases hα k with h | h <;> rw [h] <;> norm_num
   have ht0' : 0 < t 0 := lt_of_lt_of_le (by positivity) ht0
   have tele := Hd.telescope_dissipation hh hη hα hsum t ht0' hmono B N
-  have hend := (Hd.withA0 (B N)).Jbar_nonneg hh.le α hη.le (t (N + 1))
+  have hend := (Hd.withA0 (B N)).Jbar_nonneg α hη.le (t (N + 1))
   set F : ι → ι → ℝ := fun i j => 2 * Xs kk B0 i j * Ys kk B0 i j +
     Hs kk (Hd.A 2) i j * Ys kk B0 i j + Qs kk (Hd.A 1) i j * Xs kk B0 i j
   have hF : ∀ i j, 0 ≤ F i j := fun i j => by
@@ -2118,7 +2169,7 @@ theorem tendsto_Jbar (hh : 0 < Hd.h) {α : Fin 3 → ℝ} (hα1 : ∀ k, 1 ≤ �
       have cL : ∀ v, Continuous (L v) := fun v =>
         continuous_re_trace (Hd.continuous_mats continuous_id continuous_const
           (fun _ => hσ) v).1
-      exact cG.mul (continuous_finset_sum _ fun v _ => (continuous_const.mul (cL v)).mul
+      exact cG.mul (continuous_finsetSum _ fun v _ => (continuous_const.mul (cL v)).mul
         (Real.continuous_sqrt.comp ((cL v).add continuous_const)))
     refine integrable_of_le_gdom hc hε (C := Cg * K * 4 * 3) fun p => ?_
     have hφ : ∀ v, L v p ≤ N * (C₀ * phi (2 * s) v p ^ 2) := fun v =>
@@ -2201,12 +2252,12 @@ lemma costDensity_integrable (hh : 0 < Hd.h) {η : ℝ} (hη : 0 < η) {α : Fin
   exact (good_integrable (Q := fun z => Hd.qV α η v z.1 z.2) hta (by linarith : (0 : ℝ) < 2 * tb)
     (by norm_num : (0 : ℝ) < 1 / 10) v (G _ (by simp)).1 (G _ (by simp)).2 0).2
 
-lemma costDensity_nonneg (hh : 0 ≤ Hd.h) (α : Fin 3 → ℝ) (η : ℝ) (z : ℝ × (Fin 3 → ℝ)) :
+lemma costDensity_nonneg (α : Fin 3 → ℝ) (η : ℝ) (z : ℝ × (Fin 3 → ℝ)) :
     0 ≤ Hd.costDensity α η z := by
   refine mul_nonneg ?_ (Finset.sum_nonneg fun v _ => ENNReal.toReal_nonneg)
   rw [Gm_eq]; exact gaussian_nonneg' _ _
 
-lemma ofReal_costDensity (hh : 0 ≤ Hd.h) {η : ℝ} (hη : 0 < η) (α : Fin 3 → ℝ)
+lemma ofReal_costDensity {η : ℝ} (hη : 0 < η) (α : Fin 3 → ℝ)
     (z : ℝ × (Fin 3 → ℝ)) :
     ENNReal.ofReal (Hd.costDensity α η z) = ENNReal.ofReal (Gm (1 / 10) 0 z.1 z.2) *
       ∑ v, matCost (Hd.T z.2 (sig α z.1) v + (η : ℂ) • 1) (Hd.Ui z.2 (sig α z.1) v) := by
@@ -2245,8 +2296,8 @@ lemma ofReal_integral_Vbar (hh : 0 < Hd.h) {η : ℝ} (hη : 0 < η) {α : Fin 3
         ∂((volume.restrict (Set.Ioc ta tb)).prod volume) := by
   rw [Hd.integral_Vbar_eq hh hη hα1 hα2 hta hab, ofReal_integral_eq_lintegral_ofReal
     (Hd.costDensity_integrable hh hη hα1 hα2 hta hab)
-    (Eventually.of_forall (Hd.costDensity_nonneg hh.le α η))]
-  exact lintegral_congr fun z => Hd.ofReal_costDensity hh.le hη α z
+    (Eventually.of_forall (Hd.costDensity_nonneg α η))]
+  exact lintegral_congr fun z => Hd.ofReal_costDensity hη α z
 
 /-- **Lemma 5.2 (node D02), integrated cost with repeated changes.** For arrays `A₀ = B_k` on
 `[t_k, t_{k+1}]` (`h² ≤ t₀`), all bounded by `|B₀|` entrywise, with total variation
@@ -2347,7 +2398,7 @@ theorem repeated_mask_integrated_cost {kk : ι → ℤ} (hk : Function.Injective
       ((volume.restrict (Set.Ioc (t k) (t (k + 1)))).prod volume) := by
     intro k m
     have e : f k m = fun z => ENNReal.ofReal ((Hd.withA0 (B k)).costDensity α (η m) z) := by
-      funext z; exact ((Hd.withA0 (B k)).ofReal_costDensity hh.le (hη0 m) α z).symm
+      funext z; exact ((Hd.withA0 (B k)).ofReal_costDensity (hη0 m) α z).symm
     rw [e]
     exact ((Hd.withA0 (B k)).costDensity_integrable hh (hη0 m) hα1 hα2 (hpos k)
       (hstep k)).aestronglyMeasurable.aemeasurable.ennreal_ofReal
@@ -2517,7 +2568,8 @@ namespace IntervalList
 variable {n : ℕ} {sm sp : ℝ} (L : IntervalList n sm sp)
 
 /-- The mask `m(s) = ∑_ℓ c_ℓ 1_{(a_ℓ, b_ℓ)}(s)`. -/
-def mval (s : ℝ) : ℂ := ∑ ℓ ∈ Finset.range L.len, (Set.Ioo (L.a ℓ) (L.b ℓ)).indicator (fun _ => L.c ℓ) s
+def mval (s : ℝ) : ℂ := ∑ ℓ ∈ Finset.range L.len, (Set.Ioo (L.a ℓ) (L.b ℓ)).indicator (fun _ =>
+    L.c ℓ) s
 
 lemma norm_mval_le (s : ℝ) : ‖L.mval s‖ ≤ 1 := by
   classical
@@ -2667,27 +2719,27 @@ lemma exists_switch_partition (E : Finset ℝ) {sm sp : ℝ} (hsm : sm ∈ E) (h
     · omega
     · exact le_rfl
   have ht0 : t 0 = sm := by
-    simp only [t, dif_pos hK0]
+    simp only [t, dite_eq_left hK0]
     rw [Finset.orderEmbOfFin_zero rfl hK0]
     exact le_antisymm (Finset.min'_le _ _ hsm)
       ((hE _ (Finset.min'_mem _ _)).1)
   refine ⟨K - 2, t, hmono, ht0, ?_, ?_, ?_⟩
   · have : K - 2 + 1 = K - 1 := by omega
-    simp only [t, this, dif_pos (by omega : K - 1 < K)]
+    simp only [t, this, dite_eq_left (by omega : K - 1 < K)]
     rw [Finset.orderEmbOfFin_last rfl hK0]
     exact le_antisymm ((hE _ (Finset.max'_mem _ _)).2) (Finset.le_max' _ _ hsp)
   · intro k hk
     have h1 : k < K := by omega
     have h2 : k + 1 < K := by omega
-    simp only [t, dif_pos h1, dif_pos h2]
+    simp only [t, dite_eq_left h1, dite_eq_left h2]
     exact emb.strictMono (Fin.mk_lt_mk.2 (Nat.lt_succ_self k))
   · intro e he k hk y hy
     have h1 : k < K := by omega
     have h2 : k + 1 < K := by omega
     obtain ⟨⟨j, hj⟩, rfl⟩ : e ∈ Set.range emb := by
       rw [Finset.range_orderEmbOfFin]; exact he
-    have htk : t k = emb ⟨k, h1⟩ := by simp only [t, dif_pos h1]
-    have htk1 : t (k + 1) = emb ⟨k + 1, h2⟩ := by simp only [t, dif_pos h2]
+    have htk : t k = emb ⟨k, h1⟩ := by simp only [t, dite_eq_left h1]
+    have htk1 : t (k + 1) = emb ⟨k + 1, h2⟩ := by simp only [t, dite_eq_left h2]
     rw [htk, htk1] at hy ⊢
     rcases le_or_gt j k with hjk | hjk
     · have : emb ⟨j, hj⟩ ≤ emb ⟨k, h1⟩ := emb.monotone (Fin.mk_le_mk.2 hjk)
@@ -2803,13 +2855,13 @@ theorem masked_integrated_cost {kk : ι → ℤ} (hk : Function.Injective kk)
     refine strictMono_nat_of_lt_succ fun k => ?_
     simp only [x]
     by_cases h1 : k + 1 ≤ N
-    · rw [if_pos h1, if_pos (by omega)]
+    · rw [ite_eq_left h1, ite_eq_left (by omega)]
       have := hstrict k (by omega)
       have := hstrict (k + 1) h1
       simp only [mid]; linarith
-    · rw [if_neg h1]
+    · rw [ite_eq_right h1]
       by_cases h2 : k ≤ N
-      · rw [if_pos h2]
+      · rw [ite_eq_left h2]
         have hkN : k = N := by omega
         have := (hmid k h2).2
         rw [hkN] at this ⊢
@@ -2817,7 +2869,7 @@ theorem masked_integrated_cost {kk : ι → ℤ} (hk : Function.Injective kk)
         have : (0 : ℝ) ≤ ((N + 1 : ℕ) : ℝ) := Nat.cast_nonneg _
         push_cast at this ⊢
         linarith
-      · rw [if_neg h2]; push_cast; linarith
+      · rw [ite_eq_right h2]; push_cast; linarith
   have hvar : ∀ i j, ∑ k ∈ Finset.range N, ‖B (k + 1) i j - B k i j‖ ≤
       2 * (n : ℝ) * ‖Hd.A 0 i j‖ := by
     intro i j
@@ -2825,7 +2877,8 @@ theorem masked_integrated_cost {kk : ι → ℤ} (hk : Function.Injective kk)
         ‖Hd.A 0 i j‖ * ‖(M i j).mval (x (k + 1)) - (M i j).mval (x k)‖ := by
       intro k hk
       have hk' : k < N := Finset.mem_range.1 hk
-      simp only [B, maskA, x, if_pos (show k + 1 ≤ N by omega), if_pos (show k ≤ N by omega)]
+      simp only [B, maskA, x, ite_eq_left (show k + 1 ≤ N by omega), ite_eq_left (show k ≤ N by
+          omega)]
       rw [← mul_sub, norm_mul]
     rw [Finset.sum_congr rfl hx, ← Finset.mul_sum]
     have := (M i j).sum_mval_change_le hxmono N
@@ -2835,7 +2888,7 @@ theorem masked_integrated_cost {kk : ι → ℤ} (hk : Function.Injective kk)
     hB (Nat.cast_nonneg n) N hvar
   -- decompose the scale integral along the switches
   rw [show Set.Ioc sm sp = Set.Ioc (t 0) (t (N + 1)) by rw [ht0, htN],
-    restrict_Ioc_prod_eq_sum volume hmono N, lintegral_finset_sum_measure]
+    restrict_Ioc_prod_eq_sum volume hmono N, lintegral_finsetSum_measure]
   refine le_trans (le_of_eq (Finset.sum_congr rfl fun k hk => ?_)) hD02
   have hkN : k ≤ N := Nat.lt_succ_iff.1 (Finset.mem_range.1 hk)
   refine lintegral_congr_ae ?_
@@ -2865,13 +2918,15 @@ section D03Trace
 
 variable {ι : Type*} [Fintype ι] [DecidableEq ι]
 
+omit [DecidableEq ι] in
 lemma trace_mul_three (X Y Z : Matrix ι ι ℂ) :
     (X * Y * Z).trace = ∑ i, ∑ j, ∑ k, X i j * Y j k * Z k i := by
   simp only [Matrix.trace, Matrix.diag, Matrix.mul_apply, Finset.sum_mul]
   rw [Finset.sum_congr rfl fun i _ => Finset.sum_comm]
 
 /-- The cyclic trace with diagonal insertions and square-root weights:
-`tr(diag(x₀) W₀ diag(x₁) W₁ diag(x₂) W₂) = ∑ B₀(i,j) B₁(j,k) B₂(k,i) (x₀r₀²)(i) (x₁r₁²)(j) (x₂r₂²)(k)`
+`tr(diag(x₀) W₀ diag(x₁) W₁ diag(x₂) W₂) = ∑ B₀(i,j) B₁(j,k) B₂(k,i) (x₀r₀²)(i) (x₁r₁²)(j)
+    (x₂r₂²)(k)`
 for `W₀ = diag(r₀) B₀ diag(r₁)`, `W₁ = diag(r₁) B₁ diag(r₂)`, `W₂ = diag(r₂) B₂ diag(r₀)`. -/
 lemma trace_cyclic_diag (x₀ x₁ x₂ r₀ r₁ r₂ : ι → ℝ) (B₀ B₁ B₂ : Matrix ι ι ℂ) :
     (rdiag x₀ * (rdiag r₀ * B₀ * rdiag r₁) * rdiag x₁ * (rdiag r₁ * B₁ * rdiag r₂) *
@@ -2898,7 +2953,7 @@ lemma integral_fin2 {F : (Fin 2 → ℝ) → ℂ} (hF : Integrable F) :
   rw [← h2.integral_comp' (g := F), Measure.volume_eq_prod, integral_prod]
   · refine integral_congr_ae (Eventually.of_forall fun x => integral_congr_ae
       (Eventually.of_forall fun y => ?_))
-    show F (MeasurableEquiv.finTwoArrow.symm (x, y)) = F ![x, y]
+    change F (MeasurableEquiv.finTwoArrow.symm (x, y)) = F ![x, y]
     congr 1
   · exact (h2.integrable_comp_emb MeasurableEquiv.finTwoArrow.symm.measurableEmbedding).2 hF
 
@@ -2910,7 +2965,8 @@ lemma integrable_fin2_prod {f g : ℝ → ℝ} (hf : Integrable f) (hg : Integra
   exact this
 
 /-- **The plane convolution (Lemma 5.3):**
-`∫_{Π₀} g_σ^{(d₀)}(c₀ - p₀) g_σ^{(d₁)}(c₁ - p₁) g_σ^{(d₂)}(c₂ - p₂) dπ₀ = g_{3σ}^{(d₀+d₁+d₂)}(c₀+c₁+c₂)`. -/
+`∫_{Π₀} g_σ^{(d₀)}(c₀ - p₀) g_σ^{(d₁)}(c₁ - p₁) g_σ^{(d₂)}(c₂ - p₂) dπ₀ =
+    g_{3σ}^{(d₀+d₁+d₂)}(c₀+c₁+c₂)`. -/
 theorem plane_gaussD_three (d₀ d₁ d₂ : ℕ) {σ : ℝ} (hσ : 0 < σ) (c₀ c₁ c₂ : ℝ) :
     Integrable (fun q : Fin 2 → ℝ => ((gaussianD d₀ σ (c₀ - q 0) * gaussianD d₁ σ (c₁ - q 1) *
       gaussianD d₂ σ (c₂ + q 0 + q 1) : ℝ) : ℂ)) ∧
@@ -2989,7 +3045,8 @@ lemma dexp_le (m : ℕ) (v : Fin 3) : dexp m v ≤ 2 := by unfold dexp; split_if
 def Dfun (d : ℕ) (s x : ℝ) : ℝ :=
   √s ^ d * gaussianD d (21 / 20 * s) x / gaussian (11 / 10 * s) x
 
-/-- The coefficient `a_{j,s}(d) = -s^{j/2} g_{γs}^{(j-1)}(d) / g_{βs}(d)` (`γ = 1/20`, `β = 1/10`). -/
+/-- The coefficient `a_{j,s}(d) = -s^{j/2} g_{γs}^{(j-1)}(d) / g_{βs}(d)` (`γ = 1/20`, `β =
+    1/10`). -/
 def acoef (j : ℕ) (s d : ℝ) : ℝ :=
   -(√s ^ j * gaussianD (j - 1) (1 / 20 * s) d / gaussian (1 / 10 * s) d)
 
@@ -3110,7 +3167,7 @@ lemma integrable_avgMeasure_real (s : ℝ) {f : ℝ → ℝ}
   simp only [NNReal.smul_def, Real.coe_toNNReal _ (gaussian_nonneg' _ _), smul_eq_mul]
 
 /-- Averages of weighted Grams. -/
-lemma matIntegral_wGram {κ : Type*} [Fintype κ] {ν : Measure ℝ} (B : Matrix ι κ ℂ)
+lemma matIntegral_wGram {κ : Type*} {ν : Measure ℝ} (B : Matrix ι κ ℂ)
     (f : ℝ → ι → ℝ) (hf : ∀ i, Integrable (fun d => f d i) ν) :
     (∀ a b, Integrable (fun d => wGram B (f d) a b) ν) ∧
     matIntegral ν (fun d => wGram B (f d)) = wGram B (fun i => ∫ d, f d i ∂ν) := by
@@ -3166,9 +3223,11 @@ theorem vertex_avg (hh : 0 < Hd.h) (v : Fin 3) {j : ℕ} (hj : 1 ≤ j) {Ca : �
       ((Hd.R p (fun _ => 11 / 10 * s) v)ᴴ * rdiag (fun i => Dfun j s (Hd.u i - p v)) *
         Hd.R p (fun _ => 11 / 10 * s) v) ≤
       ENNReal.ofReal (Ca ^ 2 * s) * ∫⁻ d, ENNReal.ofReal (gaussian (1 / 10 * s) d) *
-        matCost (Hd.T (Function.update p v (p v + d)) (Function.update (fun _ => 11 / 10 * s) v s) v)
-          (Hd.Ui (Function.update p v (p v + d)) (Function.update (fun _ => 11 / 10 * s) v s) v) := by
-  haveI : Fact (0 < s) := ⟨hs⟩
+        matCost (Hd.T (Function.update p v (p v + d)) (Function.update (fun _ => 11 / 10 * s) v
+            s) v)
+          (Hd.Ui (Function.update p v (p v + d)) (Function.update (fun _ => 11 / 10 * s) v s) v)
+              := by
+  have : Fact (0 < s) := ⟨hs⟩
   set σB : Fin 3 → ℝ := fun _ => 11 / 10 * s
   have hσB : ∀ k, 0 < σB k := fun k => by simp only [σB]; positivity
   set σV := Function.update σB v s
@@ -3213,11 +3272,11 @@ theorem vertex_avg (hh : 0 < Hd.h) (v : Fin 3) {j : ℕ} (hj : 1 ≤ j) {Ca : �
       fun_prop
     have := h1.mul_bdd (c := Hd.h * M) hc1.aestronglyMeasurable
       (Eventually.of_forall fun d => by
-        show ‖-(Hd.h * gaussianD 1 s (Hd.u i - (p v + d)))‖ ≤ _
+        change ‖-(Hd.h * gaussianD 1 s (Hd.u i - (p v + d)))‖ ≤ _
         rw [Real.norm_eq_abs, abs_neg, abs_mul, abs_of_pos hh]
         exact mul_le_mul_of_nonneg_left (hM _) hh.le)
     refine this.congr (Eventually.of_forall fun d => ?_)
-    show -(√s ^ j * gaussianD (j - 1) (1 / 20 * s) d) *
+    change -(√s ^ j * gaussianD (j - 1) (1 / 20 * s) d) *
       -(Hd.h * gaussianD 1 s (Hd.u i - (p v + d))) = gaussian (1 / 10 * s) d * fK d i
     simp only [fK]; rw [← mul_assoc, hgK]
   have hIT : ∀ i, ∫ d, fT d i ∂ν = Hd.w p σB v i := by
@@ -3242,7 +3301,8 @@ theorem vertex_avg (hh : 0 < Hd.h) (v : Fin 3) {j : ℕ} (hj : 1 ≤ j) {Ca : �
     have hg := (gaussian_pos (by positivity : (0 : ℝ) < 11 / 10 * s) (Hd.u i - p v)).ne'
     simp only [w, gweight, σB, Dfun]
     rw [show Hd.h * gaussian (11 / 10 * s) (Hd.u i - p v) *
-        (√s ^ j * gaussianD j (21 / 20 * s) (Hd.u i - p v) / gaussian (11 / 10 * s) (Hd.u i - p v)) =
+        (√s ^ j * gaussianD j (21 / 20 * s) (Hd.u i - p v) / gaussian (11 / 10 * s) (Hd.u i - p
+            v)) =
         Hd.h * (gaussian (11 / 10 * s) (Hd.u i - p v) *
           (√s ^ j * gaussianD j (21 / 20 * s) (Hd.u i - p v)) /
             gaussian (11 / 10 * s) (Hd.u i - p v)) by ring, mul_div_cancel_left₀ _ hg]
@@ -3311,7 +3371,8 @@ lemma matCost_eq_iSup {n : Type*} [Fintype n] [DecidableEq n] {P : Matrix n n �
     exact (liminf_le_limsup (f := atTop)).trans limsup_le_iSup
   · refine matCost_anti (posDef_add_smul_one hP (by positivity)).posSemidef ?_ K
     rw [Matrix.le_iff, add_sub_cancel_left]
-    exact Matrix.PosSemidef.one.smul (by exact_mod_cast (by positivity : (0 : ℝ) ≤ 1 / ((m : ℝ) + 1)))
+    exact Matrix.PosSemidef.one.smul (by exact_mod_cast (by positivity : (0 : ℝ) ≤ 1 / ((m : ℝ)
+        + 1)))
 
 /-- The matrix of the change of variables `(q₀, q₁, d) ↦ (q₀, q₁, -q₀-q₁) + d e_v`. -/
 def shiftMat (v : Fin 3) : Matrix (Fin 3) (Fin 3) ℝ := fun r c =>
@@ -3321,8 +3382,7 @@ lemma shiftMat_mulVec (v : Fin 3) (x : Fin 3 → ℝ) :
     shiftMat v *ᵥ x = Function.update (planePt ![x 0, x 1]) v (planePt ![x 0, x 1] v + x 2) := by
   ext r
   fin_cases v <;> fin_cases r <;>
-    simp [shiftMat, Matrix.mulVec, dotProduct, Fin.sum_univ_three, planePt,
-      Function.update_apply] <;> ring
+    simp [shiftMat, Matrix.mulVec, dotProduct, Fin.sum_univ_three, planePt] <;> ring
 
 lemma det_shiftMat (v : Fin 3) : (shiftMat v).det = 1 := by
   fin_cases v <;> simp [Matrix.det_fin_three, shiftMat]
@@ -3331,7 +3391,7 @@ lemma sum_shift (v : Fin 3) (q : Fin 2 → ℝ) (d : ℝ) :
     Function.update (planePt q) v (planePt q v + d) 0 +
       Function.update (planePt q) v (planePt q v + d) 1 +
       Function.update (planePt q) v (planePt q v + d) 2 = d := by
-  fin_cases v <;> simp [planePt, Function.update_apply] <;> ring
+  fin_cases v <;> simp [planePt] <;> ring
 
 /-- **Change of variables (proof of Lemma 5.3):** integrating `F(p + d e_v)` over the base plane
 `Π₀` (coordinates `p₀, p₁`) and over `d` is integrating `F` over `ℝ³`. -/
@@ -3358,16 +3418,16 @@ theorem lintegral_plane_shift (v : Fin 3) {F : (Fin 3 → ℝ) → ℝ≥0∞} (
       funext x; rw [shiftMat_mulVec]
     rw [this]
     exact (Matrix.toLin' (shiftMat v)).continuous_on_pi.measurable
-  show ∫⁻ q : Fin 2 → ℝ, ∫⁻ d, F (Function.update (planePt q) v (planePt q v + d)) = ∫⁻ x, G x
+  change ∫⁻ q : Fin 2 → ℝ, ∫⁻ d, F (Function.update (planePt q) v (planePt q v + d)) = ∫⁻ x, G x
   rw [← hmp.lintegral_comp hG,
     lintegral_prod_symm (fun z => G (e.symm z)) (hG.comp e.symm.measurable).aemeasurable]
   refine lintegral_congr fun q => lintegral_congr fun d => ?_
-  simp only [G, Function.comp_apply]
+  simp only [G]
   have h0 : e.symm (d, q) 0 = q 0 := rfl
   have h1 : e.symm (d, q) 1 = q 1 := rfl
   have h2 : e.symm (d, q) 2 = d := rfl
   rw [h0, h1, h2]
-  congr 3 <;> (congr 1; ext i; fin_cases i <;> rfl)
+  congr 3; ext i; fin_cases i <;> rfl
 
 end D03Change
 
@@ -3388,6 +3448,7 @@ def baseTrace (m : ℕ) (p : Fin 3 → ℝ) (s : ℝ) : ℂ :=
   (Hd.Dmat m 0 p s * Hd.W p (fun _ => 11 / 10 * s) 0 * Hd.Dmat m 1 p s *
     Hd.W p (fun _ => 11 / 10 * s) 1 * Hd.Dmat m 2 p s * Hd.W p (fun _ => 11 / 10 * s) 2).trace
 
+omit [Fintype ι] [DecidableEq ι] in
 lemma Dfun_mul_w (hh : 0 ≤ Hd.h) (d : ℕ) {s : ℝ} (hs : 0 < s) (p : Fin 3 → ℝ) (v : Fin 3)
     (i : ι) :
     Dfun d s (Hd.u i - p v) * Hd.sqw p (fun _ => 11 / 10 * s) v i ^ 2 =
@@ -3430,7 +3491,8 @@ theorem baseTrace_eq (hh : 0 ≤ Hd.h) {m : ℕ} (hm : m = 3 ∨ m = 4) {s : ℝ
   rw [this]
   push_cast; ring
 
-/-- **The plane integral of the trace:** `∫_{Π₀} tr = h³ s^{m/2} ∑ A₀A₁A₂ g_{cs}^{(m)}(u_i+u_j+u_k)`. -/
+/-- **The plane integral of the trace:** `∫_{Π₀} tr = h³ s^{m/2} ∑ A₀A₁A₂
+    g_{cs}^{(m)}(u_i+u_j+u_k)`. -/
 theorem integral_baseTrace (hh : 0 ≤ Hd.h) {m : ℕ} (hm : m = 3 ∨ m = 4) {s : ℝ} (hs : 0 < s) :
     Integrable (fun q : Fin 2 → ℝ => Hd.baseTrace m (planePt q) s) ∧
     ∫ q : Fin 2 → ℝ, Hd.baseTrace m (planePt q) s = ((Hd.h ^ 3 * √s ^ m : ℝ) : ℂ) *
@@ -3489,14 +3551,16 @@ section MaskPartition
 
 variable {ι : Type*} [Fintype ι] [DecidableEq ι]
 
+omit [DecidableEq ι] [Fintype ι] in
 /-- **The partition of `[s₋, s₊]` by the switch scales of the masks**, with the arrays on the
 pieces, their entry bounds, total variation `≤ 2n`, and constancy on the open pieces. -/
-theorem mask_partition (A : Matrix ι ι ℂ) {n : ℕ} {sm sp : ℝ} (hlt : sm < sp)
+theorem mask_partition [Finite ι] (A : Matrix ι ι ℂ) {n : ℕ} {sm sp : ℝ} (hlt : sm < sp)
     (M : ι → ι → IntervalList n sm sp) :
     ∃ (N : ℕ) (t : ℕ → ℝ) (B : ℕ → Matrix ι ι ℂ), Monotone t ∧ t 0 = sm ∧ t (N + 1) = sp ∧
       (∀ k ≤ N, t k < t (k + 1)) ∧ (∀ k i j, ‖B k i j‖ ≤ ‖A i j‖) ∧
       (∀ i j, ∑ k ∈ Finset.range N, ‖B (k + 1) i j - B k i j‖ ≤ 2 * (n : ℝ) * ‖A i j‖) ∧
       (∀ k ≤ N, ∀ s ∈ Set.Ioo (t k) (t (k + 1)), maskA A M s = B k) := by
+  let := Fintype.ofFinite ι
   classical
   have hmemE : ∀ (i j : ι) (ℓ : ℕ), ℓ < (M i j).len →
       (M i j).a ℓ ∈ switchSet M ∧ (M i j).b ℓ ∈ switchSet M := by
@@ -3529,13 +3593,13 @@ theorem mask_partition (A : Matrix ι ι ℂ) {n : ℕ} {sm sp : ℝ} (hlt : sm 
       refine strictMono_nat_of_lt_succ fun k => ?_
       simp only [x]
       by_cases h1 : k + 1 ≤ N
-      · rw [if_pos h1, if_pos (by omega)]
+      · rw [ite_eq_left h1, ite_eq_left (by omega)]
         have := hstrict k (by omega)
         have := hstrict (k + 1) h1
         simp only [mid]; linarith
-      · rw [if_neg h1]
+      · rw [ite_eq_right h1]
         by_cases h2 : k ≤ N
-        · rw [if_pos h2]
+        · rw [ite_eq_left h2]
           have hkN : k = N := by omega
           have := (hmid k h2).2
           rw [hkN] at this ⊢
@@ -3543,12 +3607,13 @@ theorem mask_partition (A : Matrix ι ι ℂ) {n : ℕ} {sm sp : ℝ} (hlt : sm 
           have : (0 : ℝ) ≤ ((N + 1 : ℕ) : ℝ) := Nat.cast_nonneg _
           push_cast at this ⊢
           linarith
-        · rw [if_neg h2]; push_cast; linarith
+        · rw [ite_eq_right h2]; push_cast; linarith
     have hx : ∀ k ∈ Finset.range N, ‖B (k + 1) i j - B k i j‖ =
         ‖A i j‖ * ‖(M i j).mval (x (k + 1)) - (M i j).mval (x k)‖ := by
       intro k hk
       have hk' : k < N := Finset.mem_range.1 hk
-      simp only [B, maskA, x, if_pos (show k + 1 ≤ N by omega), if_pos (show k ≤ N by omega)]
+      simp only [B, maskA, x, ite_eq_left (show k + 1 ≤ N by omega), ite_eq_left (show k ≤ N by
+          omega)]
       rw [← mul_sub, norm_mul]
     rw [Finset.sum_congr rfl hx, ← Finset.mul_sum]
     have := (M i j).sum_mval_change_le hxmono N
@@ -3598,7 +3663,7 @@ lemma continuousOn_kernIntegrand (m : ℕ) (t : ℝ) :
   have hg : ContinuousOn (fun s : ℝ => gaussianD m (63 / 20 * s) t) (Set.Ioi 0) :=
     (continuousOn_gaussianD_joint m).comp ((continuous_const.mul continuous_id).prodMk
       continuous_const).continuousOn fun s hs => by
-        simp only [Set.mem_setOf_eq]; exact mul_pos (by norm_num) hs
+        simp only [Set.mem_ofPred_eq]; exact mul_pos (by norm_num) hs
   exact ((Real.continuous_sqrt.pow m).continuousOn.mul hg).div continuous_id.continuousOn
     fun s hs => (ne_of_gt hs)
 
@@ -3673,7 +3738,7 @@ lemma measurable_rowCost (σ : Fin 3 → ℝ) (hσ : ∀ k, 0 < σ k) (v : Fin 3
     (by positivity : (0 : ℝ) < 1 / ((m : ℝ) + 1)) v).2.2.2.2.2.2.2.1).measurable
 
 /-- The integrand of the averaged row costs is a.e. measurable on `[a, b] × ℝ³`, `a > 0`. -/
-lemma aemeasurable_costIntegrand {α : Fin 3 → ℝ} (hα : ∀ k, 0 < α k) (hh : 0 ≤ Hd.h)
+lemma aemeasurable_costIntegrand {α : Fin 3 → ℝ} (hα : ∀ k, 0 < α k)
     (B : Matrix ι ι ℂ) {a b : ℝ} (ha : 0 < a) :
     AEMeasurable (Hd.costIntegrand α B) ((volume.restrict (Set.Ioc a b)).prod volume) := by
   set η : ℕ → ℝ := fun m => 1 / ((m : ℝ) + 1)
@@ -3681,7 +3746,7 @@ lemma aemeasurable_costIntegrand {α : Fin 3 → ℝ} (hα : ∀ k, 0 < α k) (h
   have e : Hd.costIntegrand α B = fun z => ⨆ m : ℕ,
       ENNReal.ofReal ((Hd.withA0 B).costDensity α (η m) z) := by
     funext z
-    simp only [(Hd.withA0 B).ofReal_costDensity hh (hη _)]
+    simp only [(Hd.withA0 B).ofReal_costDensity (hη _)]
     rw [costIntegrand, ← ENNReal.mul_iSup]
     congr 1
     rw [← ENNReal.finsetSum_iSup_of_monotone]
@@ -3712,7 +3777,7 @@ lemma aemeasurable_costIntegrand {α : Fin 3 → ℝ} (hα : ∀ k, 0 < α k) (h
     have hV : ∀ v, ContinuousOn (fun z : ℝ × (Fin 3 → ℝ) =>
         (Hd.withA0 B).qV α (η m) v z.1 z.2) (Set.Ioi 0 ×ˢ Set.univ) := fun v =>
       ((Hd.withA0 B).continuousOn_family α hα (hη m) v).2.2.2.2.2.2.2.1
-    exact hG.mul (continuousOn_finset_sum _ fun v _ => hV v)
+    exact hG.mul (continuousOn_finsetSum _ fun v _ => hV v)
   exact (hc.mono (Set.prod_mono (fun s hs => ha.trans hs.1) le_rfl)).aestronglyMeasurable
     (measurableSet_Ioc.prod MeasurableSet.univ) |>.aemeasurable
 
@@ -3736,7 +3801,7 @@ def D03sum {n : ℕ} {sm sp : ℝ} (M : ι → ι → IntervalList n sm sp) (m :
       (M i j).c ℓ * (Kern m ((M i j).a ℓ) ((M i j).b ℓ) (Hd.u i + Hd.u j + Hd.u k) : ℂ)
 
 lemma measurable_mval {n : ℕ} {sm sp : ℝ} (L : IntervalList n sm sp) : Measurable L.mval :=
-  Finset.measurable_sum _ fun ℓ _ => measurable_const.indicator measurableSet_Ioo
+  Finset.measurable_sum _ fun _ _ => measurable_const.indicator measurableSet_Ioo
 
 /-- **The integrated trace is the left side of Lemma 5.3.** -/
 theorem D03sum_eq (hh : 0 ≤ Hd.h) {m : ℕ} (hm : m = 3 ∨ m = 4) {n : ℕ} {sm sp : ℝ}
@@ -3795,8 +3860,8 @@ lemma sq_smul_one_sub_rdiag_psd {ι : Type*} [Fintype ι] [DecidableEq ι] {f : 
       rdiag fun i => d ^ 2 - f i ^ 2 := by
     ext i j
     by_cases hij : i = j
-    · subst hij; simp [rdiag, Matrix.one_apply, Matrix.diagonal_apply]; push_cast; ring
-    · simp [rdiag, Matrix.one_apply, Matrix.diagonal_apply, hij]
+    · subst hij; simp [rdiag]; ring
+    · simp [rdiag, hij]
   rw [e]
   refine rdiag_posSemidef fun i => ?_
   have := hf i
@@ -3859,6 +3924,7 @@ namespace HeatData
 
 variable (Hd : HeatData ι)
 
+omit [DecidableEq ι] in
 /-- **Lemma 5.3 before normalization:**
 `|h³ ∑ A₀A₁A₂ ∑_ℓ η_ℓ K^{(m)}| ≤ C (n₀³ + n₁³ + n₂³ + n (2n₀³ + n₀²n₂ + n₀²n₁))`. -/
 theorem D03_pre {kk : ι → ℤ} (hk : Function.Injective kk) (hu : ∀ i, Hd.u i = Hd.h * kk i)
@@ -3868,6 +3934,7 @@ theorem D03_pre {kk : ι → ℤ} (hk : Function.Injective kk) (hu : ∀ i, Hd.u
       nNorm Hd.h (Hd.A 2) ^ 3 + n * (2 * nNorm Hd.h (Hd.A 0) ^ 3 +
         nNorm Hd.h (Hd.A 0) ^ 2 * nNorm Hd.h (Hd.A 2) +
         nNorm Hd.h (Hd.A 0) ^ 2 * nNorm Hd.h (Hd.A 1))) := by
+  classical
   classical
   have hsm0 : 0 < sm := lt_of_lt_of_le (by positivity) hsm
   obtain ⟨hcD, hD⟩ := constD_spec
@@ -3932,9 +3999,9 @@ theorem D03_pre {kk : ι → ℤ} (hk : Function.Injective kk) (hu : ∀ i, Hd.u
         refine continuous_pi fun k => ?_
         by_cases hk : k = v
         · subst hk; simp only [Function.update_self]
-          fin_cases k <;> simp [planePt] <;> fun_prop
+          fin_cases k <;> dsimp [planePt] <;> fun_prop
         · simp only [Function.update_of_ne hk]
-          fin_cases k <;> simp [planePt] <;> fun_prop
+          fin_cases k <;> dsimp [planePt] <;> fun_prop
       exact this.measurable
     have hcv : ∀ v, ∫⁻ q : Fin 2 → ℝ, ∫⁻ d, ENNReal.ofReal (gaussian (1 / 10 * s) d) *
         Φ v (Function.update (planePt q) v (planePt q v + d)) ≤
@@ -3969,7 +4036,7 @@ theorem D03_pre {kk : ι → ℤ} (hk : Function.Injective kk) (hu : ∀ i, Hd.u
           ∑ v, ENNReal.ofReal (constA ^ 2 * s) * ∫⁻ q : Fin 2 → ℝ, ∫⁻ d,
             ENNReal.ofReal (gaussian (1 / 10 * s) d) *
               Φ v (Function.update (planePt q) v (planePt q v + d))) := by
-          rw [lintegral_const_mul' _ _ ENNReal.ofReal_ne_top, lintegral_finset_sum' _
+          rw [lintegral_const_mul' _ _ ENNReal.ofReal_ne_top, lintegral_finsetSum' _
             fun v _ => hI v]
           congr 2
           refine Finset.sum_congr rfl fun v _ => ?_
@@ -3991,7 +4058,7 @@ theorem D03_pre {kk : ι → ℤ} (hk : Function.Injective kk) (hu : ∀ i, Hd.u
     rw [ofReal_norm, Hd.D03sum_eq hh.le hm hsm0 M]
     refine (enorm_integral_le_lintegral_enorm _).trans ?_
     rw [show Set.Ioc sm sp = Set.Ioc (t 0) (t (N + 1)) by rw [ht0, htN],
-      restrict_Ioc_eq_sum hmono N, lintegral_finset_sum_measure]
+      restrict_Ioc_eq_sum hmono N, lintegral_finsetSum_measure]
     have hk : ∀ k ∈ Finset.range (N + 1),
         ∫⁻ s in Set.Ioc (t k) (t (k + 1)), ‖((1 / s : ℝ) : ℂ) * ∫ q : Fin 2 → ℝ,
           (Hd.withA0 (maskA (Hd.A 0) M s)).baseTrace m (planePt q) s‖ₑ ≤
@@ -4010,14 +4077,14 @@ theorem D03_pre {kk : ι → ℤ} (hk : Function.Injective kk) (hu : ∀ i, Hd.u
             exact hpiece (B k) s (ht_pos.trans hs.1)
         _ = ENNReal.ofReal c * ∑ v, ∫⁻ s in Set.Ioc (t k) (t (k + 1)),
               ∫⁻ p, Hd.costIntegrand (rateAt v) (B k) (s, p) := by
-            rw [lintegral_const_mul' _ _ ENNReal.ofReal_ne_top, lintegral_finset_sum']
+            rw [lintegral_const_mul' _ _ ENNReal.ofReal_ne_top, lintegral_finsetSum']
             intro v _
-            exact (Hd.aemeasurable_costIntegrand (rateAt_pos v) hh.le (B k)
+            exact (Hd.aemeasurable_costIntegrand (rateAt_pos v) (B k)
               ht_pos).lintegral_prod_right'
         _ = _ := by
             congr 1
             refine Finset.sum_congr rfl fun v _ => ?_
-            rw [lintegral_prod _ (Hd.aemeasurable_costIntegrand (rateAt_pos v) hh.le (B k) ht_pos)]
+            rw [lintegral_prod _ (Hd.aemeasurable_costIntegrand (rateAt_pos v) (B k) ht_pos)]
     refine (Finset.sum_le_sum hk).trans ?_
     rw [← Finset.mul_sum, Finset.sum_comm]
     exact mul_le_mul' le_rfl (Finset.sum_le_sum fun v _ => hD02 v)
@@ -4091,13 +4158,15 @@ variable (Hd : HeatData ι)
 /-- The data with the arrays rescaled by `c_v`. -/
 def scaleA (c : Fin 3 → ℂ) : HeatData ι := ⟨Hd.u, Hd.h, fun v => c v • Hd.A v⟩
 
+omit [DecidableEq ι] in
 lemma D03sum_scaleA {n : ℕ} {sm sp : ℝ} (M : ι → ι → IntervalList n sm sp) (m : ℕ)
     (c : Fin 3 → ℂ) : (Hd.scaleA c).D03sum M m = c 0 * c 1 * c 2 * Hd.D03sum M m := by
   simp only [D03sum, scaleA, Matrix.smul_apply, smul_eq_mul, Finset.mul_sum]
   refine Finset.sum_congr rfl fun i _ => Finset.sum_congr rfl fun j _ =>
     Finset.sum_congr rfl fun k _ => ?_
-  ring
+  ring_nf
 
+omit [DecidableEq ι] in
 /-- **Lemma 5.3 (node D03), third and fourth derivative kernels.** For `m = 3, 4`, nodes
 `uᵢ = h kᵢ` on the integer mesh, masks of at most `n ≥ 1` disjoint scale intervals in
 `[s₋, s₊]` with `h² ≤ s₋`, and coefficients of modulus at most one:
@@ -4109,6 +4178,7 @@ theorem Gaussian_derivative_grid_count {kk : ι → ℤ} (hk : Function.Injectiv
     (M : ι → ι → IntervalList n sm sp) :
     ‖Hd.D03sum M m‖ ≤ 7 * constD03 * √n * nNorm Hd.h (Hd.A 0) * nNorm Hd.h (Hd.A 1) *
       nNorm Hd.h (Hd.A 2) := by
+  classical
   set N0 := nNorm Hd.h (Hd.A 0)
   set N1 := nNorm Hd.h (Hd.A 1)
   set N2 := nNorm Hd.h (Hd.A 2)
@@ -4145,21 +4215,21 @@ theorem Gaussian_derivative_grid_count {kk : ι → ℤ} (hk : Function.Injectiv
   set c : Fin 3 → ℂ := ![((N0 * √n)⁻¹ : ℝ), (N1⁻¹ : ℝ), (N2⁻¹ : ℝ)]
   set Hs := Hd.scaleA c
   have hn0 : nNorm Hs.h (Hs.A 0) = (√n)⁻¹ := by
-    show nNorm Hd.h (c 0 • Hd.A 0) = _
+    change nNorm Hd.h (c 0 • Hd.A 0) = _
     rw [nNorm_smul]
     change ‖c 0‖ * N0 = _
     have : c 0 = (((N0 * √n)⁻¹ : ℝ) : ℂ) := rfl
     rw [this, Complex.norm_real, Real.norm_eq_abs, abs_of_pos (by positivity), mul_inv]
     field_simp
   have hn1' : nNorm Hs.h (Hs.A 1) = 1 := by
-    show nNorm Hd.h (c 1 • Hd.A 1) = _
+    change nNorm Hd.h (c 1 • Hd.A 1) = _
     rw [nNorm_smul]
     change ‖c 1‖ * N1 = _
     have : c 1 = ((N1⁻¹ : ℝ) : ℂ) := rfl
     rw [this, Complex.norm_real, Real.norm_eq_abs, abs_of_pos (by positivity)]
     field_simp
   have hn2' : nNorm Hs.h (Hs.A 2) = 1 := by
-    show nNorm Hd.h (c 2 • Hd.A 2) = _
+    change nNorm Hd.h (c 2 • Hd.A 2) = _
     rw [nNorm_smul]
     change ‖c 2‖ * N2 = _
     have : c 2 = ((N2⁻¹ : ℝ) : ℂ) := rfl

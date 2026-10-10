@@ -88,6 +88,7 @@ variable {X : Type*} [MeasurableSpace X]
 def fwdSetK (T : X → X) (h : X → ℝ) (t : ℝ) (K : ℕ) : Set X :=
   {x | ∃ N : ℕ, 1 ≤ N ∧ N ≤ K ∧ t < (N : ℝ)⁻¹ * ∑ n ∈ Finset.range N, h (T^[n] x)}
 
+omit [MeasurableSpace X] in
 /-- The finite-orbit-segment inequality: transference of `FinSupp.weak_forward`. -/
 lemma orbit_segment_ineq (T : X → X) {h : X → ℝ} (h0 : ∀ x, 0 ≤ h x) {t : ℝ} (ht : 0 < t)
     (K L : ℕ) (x : X) :
@@ -103,7 +104,7 @@ lemma orbit_segment_ineq (T : X → X) {h : X → ℝ} (h0 : ∀ x, 0 ≤ h x) {
     rw [hSset, Finset.sum_image (fun x _ y _ hxy => hinj hxy)]
     refine Finset.sum_congr rfl fun j hj => ?_
     simp only [ha_def]
-    rw [if_pos (Finset.mem_image_of_mem _ hj)]
+    rw [ite_eq_left (Finset.mem_image_of_mem _ hj)]
     simp
   set F : Finset ℤ := (Finset.range L).image (Nat.cast : ℕ → ℤ)
   have hw := ha.weak_forward ht F
@@ -126,7 +127,7 @@ lemma orbit_segment_ineq (T : X → X) {h : X → ℝ} (h0 : ∀ x, 0 ≤ h x) {
     have hmem : ((j : ℤ) + n) ∈ Sset := by
       rw [hSset, Finset.mem_image]
       exact ⟨j + n, Finset.mem_range.2 (by omega), by push_cast; rfl⟩
-    simp only [ha_def, if_pos hmem]
+    simp only [ha_def, ite_eq_left hmem]
     have : ((j : ℤ) + n).toNat = n + j := by omega
     rw [this, Function.iterate_add_apply]
   have hc := Finset.card_le_card this
@@ -447,7 +448,7 @@ lemma bilin_weak_core_top [IsProbabilityMeasure μ] {T S : X → X}
     intro hmem
     obtain ⟨N, hN, hlt⟩ := hmem
     by_contra hcon
-    simp only [Set.mem_ofPred_eq, not_exists, not_and, not_lt] at hcon
+    simp only [not_exists, not_and, not_lt] at hcon
     have hV := hcon N hN
     have hm := norm_bilinAvg_le_T08 T S f g N x
     have hJ := avg_le_rpow_avg hN (b := fun n => ‖g (S^[n] x)‖) (fun n => norm_nonneg _) hQ
@@ -614,7 +615,7 @@ lemma exists_bdd_rep_of_memLp_top {f : X → ℂ} (hf : MemLp f ⊤ μ) :
   · filter_upwards [hf.aestronglyMeasurable.ae_eq_mk, hfK] with x hx hxK
     have hmem : x ∈ {x | ‖f₀ x‖ ≤ K} := by
       have h' : f₀ x = f x := hx.symm
-      show ‖f₀ x‖ ≤ K
+      change ‖f₀ x‖ ≤ K
       rw [h']; exact hxK
     rw [Set.indicator_of_mem hmem]
     exact hx
@@ -655,6 +656,7 @@ lemma exists_bdd_approx_seq [IsFiniteMeasure μ] {p : ℝ≥0∞} (hp : 1 ≤ p)
     refine (hle k).trans ?_
     simp
 
+omit [MeasurableSpace X] in
 lemma bilinAvg_sub_decomp (T S : X → X) (f f' g g' : X → ℂ) (N : ℕ) :
     bilinAvg T S f g N - bilinAvg T S f' g' N =
       bilinAvg T S (f - f') g N + bilinAvg T S f' (g - g') N := by
@@ -665,6 +667,7 @@ lemma bilinAvg_sub_decomp (T S : X → X) (f f' g g' : X → ℂ) (N : ℕ) :
   refine Finset.sum_congr rfl fun n _ => ?_
   ring
 
+omit [MeasurableSpace X] in
 lemma bilinAvg_eq_smul_sum (T S : X → X) (f g : X → ℂ) (N : ℕ) :
     bilinAvg T S f g N = (N : ℂ)⁻¹ • ∑ n ∈ Finset.range N,
       (fun x => f (T^[n] x)) • (fun x => g (S^[n] x)) := by
@@ -822,6 +825,7 @@ def BoundedCaseConv {X : Type*} [MeasurableSpace X] (μ : Measure X) (T S : X �
     ∀ r : ℝ, 1 ≤ r → ∃ F, MemLp F (ENNReal.ofReal r) μ ∧
       Tendsto (fun N => eLpNorm (bilinAvg T S f g N - F) (ENNReal.ofReal r) μ) atTop (𝓝 0)
 
+omit [MeasurableSpace X] in
 lemma bilinAvg_zero_N (T S : X → X) (f g : X → ℂ) (x : X) : bilinAvg T S f g 0 x = 0 := by
   simp [bilinAvg]
 
@@ -894,8 +898,8 @@ lemma T08_Lr_of_pos [IsProbabilityMeasure μ] {T S : X → X} (hT : MeasurePrese
   have hrt : r ≠ ⊤ := by intro h; rw [h] at hr0; simp at hr0
   have hr1 : 1 ≤ r := by rw [← ENNReal.inv_le_one, hr]; exact hpq
   have hR1 : 1 ≤ r.toReal := one_le_toReal_of_one_le hr1 hrt
-  haveI : Fact (1 ≤ r) := ⟨hr1⟩
-  haveI : ENNReal.HolderTriple p q r := ⟨hr.symm⟩
+  have : Fact (1 ≤ r) := ⟨hr1⟩
+  have : ENNReal.HolderTriple p q r := ⟨hr.symm⟩
   obtain ⟨fs, hfm, hfb, hfmem, hft, hfn⟩ := exists_bdd_approx_seq hp hf
   obtain ⟨gs, hgm, hgb, hgmem, hgt, -⟩ := exists_bdd_approx_seq hq hg
   apply Lr_tendsto_of_approx (memLp_bilinAvg hT hS hr1 hf hg)
