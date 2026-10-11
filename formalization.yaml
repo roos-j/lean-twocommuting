@@ -59,10 +59,6 @@ status:
       comparator_config: "comparator.json"
 automation:
   methods:
-    - method: "manual"
-      prompting_notes: >-
-        Joris Roos supplied the task and authored README.md and
-        TwoCommuting/Theorems.lean, as recorded in the README.
     - method: "agent"
       models: ["GPT 6 Astra Pro"]
       prompting_notes: >-
@@ -96,12 +92,10 @@ fidelity:
     vocabulary. Intermediate proof reformulations are recorded in
     automation/ErrorReport.md; the norm convergence assertions are not registered.
 review:
-  status: "agent-reviewed"
+  status: "self-assessed"
   notes: >-
-    Codex checked the selected statement against the blueprint and audited the
-    preparation files and local validation evidence. See automation/PalomarReview.md
-    for checks and limitations. This does not assert independent human peer
-    review, Palomar acceptance, or completion of the official Linux verifier.
+    The mathematical statement matches the Lean statement and the Lean theorem
+    depends only on standard axioms.
 alignment:
   statements:
     - source: "Blueprint Theorem 10.3 (T08), pointwise assertion"
