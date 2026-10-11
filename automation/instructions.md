@@ -9,6 +9,16 @@ Discrepancies: [ErrorReport.md](ErrorReport.md).
 
 ## Current user instructions (distilled)
 
+- **P9** (2026-10-10, raw entry P9): Commit the Palomar preparation on `palomar`.
+  This authorizes the local commit only; leave `master` unchanged.
+
+- **P8** (2026-10-10T19:12:19-04:00, recording time, raw entry P8): Use prepare-for-palomar on
+  a new `palomar` branch; leave `master` unchanged. Check current Palomar guidelines
+  and adapt the skill if necessary. Register only `pointwise_convergence_two_commuting`
+  (user confirmed). Preparation does not authorize a commit, push, or submission.
+  The deliberate Challenge placeholder is permitted for this task; the substantive
+  Solution must remain free of proof holes.
+
 - **P7** (2026-10-10T18:33:40-04:00, recording time, raw entry P7): Commit and push
   the current warning-cleanup changes, including the updated root import.
 
@@ -107,6 +117,12 @@ theorem commuting_ergodic_averages_converge_ae
 
 ## Latest verification
 
+- 2026-10-10: P8 prepares only the pointwise theorem for Palomar on `palomar`.
+  The Challenge/Solution build and quick comparison pass; metadata and local
+  policy checks pass. Full sandboxed verification requires Linux and remains
+  pending. See [PalomarReview.md](PalomarReview.md). `master` remains at
+  `33b69ccacc013c703a151421658187ea4d2029fb`; P9 authorizes the preparation commit, but not a push.
+
 - 2026-10-10T18:09:42-04:00: P6 warning cleanup complete. `lake --wfail build` succeeds
   (9031 jobs), including `TwoCommuting.Theorems`, now imported by the library root.
   Fixed unused hypotheses and typeclass requirements, redundant tactics and simp
@@ -125,6 +141,8 @@ theorem commuting_ergodic_averages_converge_ae
 
 ## Next step
 
+- P8 preparation is recorded in [PalomarReview.md](PalomarReview.md). Run the
+  remaining Linux verification before submission; keep preparation on `palomar`.
 - P6 maintenance is complete; no remaining Lean or linter warnings in the standard build.
 - The earlier section 4 continuation note was stale: the source ledger already records
   completion through section 10. This task did not reopen the formalization.
