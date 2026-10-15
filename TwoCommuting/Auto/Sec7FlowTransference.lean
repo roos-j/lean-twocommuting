@@ -143,7 +143,7 @@ lemma norm_orbitFun_le {f : Ω → ℂ} {B : ℝ} (hB : ∀ ω, ‖f ω‖ ≤ B
 lemma memLp_orbitFun (hC : CommutingFlows ν U V) {f : Ω → ℂ} (hf : Measurable f) {B : ℝ}
     (hB : ∀ ω, ‖f ω‖ ≤ B) (R : ℝ) (ω : Ω) : MemLp (orbitFun U V f R ω) 3 := by
   have hB0 : 0 ≤ B := (norm_nonneg _).trans (hB ω)
-  refine MemLp.of_le (memLp_indicator_const 3 (measurableSet_flowSq R).nullMeasurableSet B
+  refine MemLp.of_le (memLp_indicator_const 3 (measurableSet_flowSq R) B
     (Or.inr (volume_flowSq_ne_top R))) (measurable_orbitFun hC hf R ω).aestronglyMeasurable
     (Eventually.of_forall fun x => ?_)
   by_cases hx : x ∈ flowSq R

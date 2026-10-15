@@ -647,7 +647,7 @@ lemma measurable_triInt (m : ℕ) (hsm : 0 < sm) {κ : Type*} [Finite κ]
   · exact hG.comp (by fun_prop)
 
 /-- The projection `x ↦ (x₀, x₁)` of `ℝ³` to `ℝ²` pulls null sets back to null sets. -/
-lemma qmp_proj01 : QuasiMeasurePreserving (fun x : Fin 3 → ℝ => (x 0, x 1)) := by
+lemma qmp_proj01 : Measure.QuasiMeasurePreserving (fun x : Fin 3 → ℝ => (x 0, x 1)) := by
   have h := (volume_preserving_finTwoArrow ℝ).quasiMeasurePreserving.comp
     (Measure.quasiMeasurePreserving_snd.comp
       (volume_preserving_piFinSuccAbove (fun _ : Fin 3 => ℝ) 2).quasiMeasurePreserving)
