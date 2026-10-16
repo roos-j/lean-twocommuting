@@ -1,5 +1,5 @@
 /-
-Copyright (c) 2026 Joris Roos. All rights reserved.
+Copyright (c) 2026 Floris van Doorn, Polona Durcik, Lenka Slavíková, Joris Roos, Christoph Thiele. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Joris Roos
 -/
